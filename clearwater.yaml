@@ -1,0 +1,203 @@
+# Project Clearwater - IMS in the Cloud
+# Copyright (C) 2015  Metaswitch Networks Ltd
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version, along with the "Special Exception" for use of
+# the program along with SSL, set forth below. This program is distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+# without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details. You should have received a copy of the GNU General Public
+# License along with this program.  If not, see
+# <http://www.gnu.org/licenses/>.
+#
+# The author can be reached by email at clearwater@metaswitch.com or by
+# post at Metaswitch Networks Ltd, 100 Church St, Enfield EN2 6BQ, UK
+#
+# Special Exception
+# Metaswitch Networks Ltd  grants you permission to copy, modify,
+# propagate, and distribute a work formed by combining OpenSSL with The
+# Software, or a work derivative of such a combination, even if such
+# copying, modification, propagation, or distribution would otherwise
+# violate the terms of the GPL. You must comply with the GPL in all
+# respects for all of the code used other than OpenSSL.
+# "OpenSSL" means OpenSSL toolkit software distributed by the OpenSSL
+# Project and licensed under the OpenSSL Licenses, or a work based on such
+# software and licensed under the OpenSSL Licenses.
+# "OpenSSL Licenses" means the OpenSSL License and Original SSLeay License
+# under which the OpenSSL Project distributes the OpenSSL toolkit software,
+# as those licenses appear in the file LICENSE-OPENSSL.
+
+heat_template_version: 2013-05-23
+
+description: >
+  Clearwater deployment
+
+parameters:
+  public_net_id:
+    type: string
+    description: ID of public network
+  private_net_cidr:
+    type: string
+    description: Private network address (CIDR notation)
+    default: 192.168.0.0/24
+  private_net_gateway:
+    type: string
+    description: Private network gateway address
+    default: 192.168.0.254
+  private_net_pool_start:
+    type: string
+    description: Start of private network IP address pool
+    default: 192.168.0.1
+  private_net_pool_end:
+    type: string
+    description: End of private network IP address pool
+    default: 192.168.0.253
+  external_dns_ip:
+    type: string
+    description: IP address of external DNS server
+    default: 8.8.8.8
+  flavor:
+    type: string
+    description: Flavor to use
+    default: m1.small
+  image:
+    type: string
+    description: Name of image to use
+    default: trusty-server-cloudimg-amd64
+  key_name:
+    type: string
+    description: Name of keypair to assign
+    default: keypair
+  repo_url:
+    type: string
+    description: URL for Clearwater repository
+    default: http://repo.cw-ngv.com/mirw
+  zone:
+    type: string
+    description: DNS zone
+    default: example.com
+  dn_range_start:
+    type: string
+    description: First directory number in pool
+    default: "6505550000"
+  dn_range_length:
+    type: string
+    description: Number of directory numbers to add to pool
+    default: "1000"
+  dnssec_key:
+    type: string
+    description: DNSSEC private key (Base64-encoded)
+
+resources:
+  network:
+    type: http://localhost:8088/network.yaml
+    properties:
+      public_net_id: { get_param: public_net_id }
+      private_net_name: { str_replace: { params: { __stack__: { get_param: "AWS::StackName" } }, template: __stack__-private } }
+      private_net_cidr: { get_param: private_net_cidr }
+      private_net_gateway: { get_param: private_net_gateway }
+      private_net_pool_start: { get_param: private_net_pool_start }
+      private_net_pool_end: { get_param: private_net_pool_end }
+      dns_ip: { get_param: external_dns_ip }
+
+  dns:
+    type: http://localhost:8088/dns.yaml
+    properties:
+      public_net_id: { get_param: public_net_id }
+      private_net_id: { get_attr: [ network, private_net ] }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      key_name: { get_param: key_name }
+      zone: { get_param: zone }
+      dnssec_key: { get_param: dnssec_key }
+
+  ellis:
+    type: http://localhost:8088/ellis.yaml
+    properties:
+      public_net_id: { get_param: public_net_id }
+      private_net_id: { get_attr: [ network, private_net ] }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      key_name: { get_param: key_name }
+      repo_url: { get_param: repo_url }
+      zone: { get_param: zone }
+      dn_range_start: { get_param: dn_range_start }
+      dn_range_length: { get_param: dn_range_length }
+      dns_ip: { get_attr: [ dns, private_ip ] }
+      dnssec_key: { get_param: dnssec_key }
+
+  bono:
+    type: http://localhost:8088/bono.yaml
+    properties:
+      public_net_id: { get_param: public_net_id }
+      private_net_id: { get_attr: [ network, private_net ] }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      key_name: { get_param: key_name }
+      repo_url: { get_param: repo_url }
+      zone: { get_param: zone }
+      dns_ip: { get_attr: [ dns, private_ip ] }
+      dnssec_key: { get_param: dnssec_key }
+
+  sprout:
+    type: http://localhost:8088/sprout.yaml
+    properties:
+      public_net_id: { get_param: public_net_id }
+      private_net_id: { get_attr: [ network, private_net ] }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      key_name: { get_param: key_name }
+      repo_url: { get_param: repo_url }
+      zone: { get_param: zone }
+      dns_ip: { get_attr: [ dns, private_ip ] }
+      dnssec_key: { get_param: dnssec_key }
+
+  homer:
+    type: http://localhost:8088/homer.yaml
+    properties:
+      public_net_id: { get_param: public_net_id }
+      private_net_id: { get_attr: [ network, private_net ] }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      key_name: { get_param: key_name }
+      repo_url: { get_param: repo_url }
+      zone: { get_param: zone }
+      dns_ip: { get_attr: [ dns, private_ip ] }
+      dnssec_key: { get_param: dnssec_key }
+
+  homestead:
+    type: http://localhost:8088/homestead.yaml
+    properties:
+      public_net_id: { get_param: public_net_id }
+      private_net_id: { get_attr: [ network, private_net ] }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      key_name: { get_param: key_name }
+      repo_url: { get_param: repo_url }
+      zone: { get_param: zone }
+      dns_ip: { get_attr: [ dns, private_ip ] }
+      dnssec_key: { get_param: dnssec_key }
+
+  ralf:
+    type: http://localhost:8088/ralf.yaml
+    properties:
+      public_net_id: { get_param: public_net_id }
+      private_net_id: { get_attr: [ network, private_net ] }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      key_name: { get_param: key_name }
+      repo_url: { get_param: repo_url }
+      zone: { get_param: zone }
+      dns_ip: { get_attr: [ dns, private_ip ] }
+      dnssec_key: { get_param: dnssec_key }
+
+outputs:
+  zone:
+    description: DNS zone
+    value: { get_param: zone }
+  dns_ip:
+    description: IP address of DNS
+    value: { get_attr: [ dns, public_ip ] }

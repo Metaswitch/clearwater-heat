@@ -33,7 +33,7 @@
 heat_template_version: 2013-05-23
 
 description: >
-  DNS server exposing dynamic DNS using DNSSEC
+  Clearwater Ellis node
 
 parameters:
   public_net_id:
@@ -54,10 +54,25 @@ parameters:
     type: string
     description: Name of keypair to assign
     default: keypair
+  repo_url:
+    type: string
+    description: URL for Clearwater repository
+    default: http://repo.cw-ngv.com/stable
   zone:
     type: string
     description: DNS zone
     default: example.com
+  dn_range_start:
+    type: string
+    description: First directory number in pool
+    default: "6505550000"
+  dn_range_length:
+    type: string
+    description: Number of directory numbers to add to pool
+    default: "1000"
+  dns_ip:
+    type: string
+    description: IP address for DNS server
   dnssec_key:
     type: string
     description: DNSSEC private key (Base64-encoded)
@@ -77,7 +92,7 @@ resources:
   server:
     type: OS::Nova::Server
     properties:
-      name: { str_replace: { params: { __zone__: { get_param: zone } }, template: ns.__zone__ } }
+      name: { str_replace: { params: { __zone__: { get_param: zone } }, template: ellis.__zone__ } }
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
@@ -86,43 +101,76 @@ resources:
       user_data:
         str_replace:
           params:
+            __repo_url__: { get_param: repo_url }
             __zone__: { get_param: zone }
-            __dnssec_key__: { get_param: dnssec_key }
             __public_ip__: { get_attr: [ floating_ip, floating_ip_address ] }
+            __dn_range_start__: { get_param: dn_range_start }
+            __dn_range_length__: { get_param: dn_range_length }
+            __dns_ip__: { get_param: dns_ip }
+            __dnssec_key__: { get_param: dnssec_key }
           template: |
             #!/bin/bash
 
-            # Install BIND.
-            DEBIAN_FRONTEND=noninteractive apt-get install bind9 --yes
+            # Configure the APT software source.
+            echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
+            curl -L http://repo.cw-ngv.com/repo_key | apt-key add -
+            apt-get update
 
-            # Update BIND configuration with the specified zone and key.
-            cat >> /etc/bind/named.conf.local << EOF
-            key __zone__. {
-              algorithm "HMAC-MD5";
-              secret "__dnssec_key__";
-            };
-
-            zone "__zone__" IN {
-              type master;
-              file "/var/lib/bind/db.__zone__";
-              allow-update {
-                key __zone__.;
-              };
-            };
+            # Configure /etc/clearwater/config.
+            mkdir -p /etc/clearwater
+            cat > /etc/clearwater/config << EOF
+            # Deployment definitions
+            home_domain=__zone__
+            sprout_hostname=sprout.__zone__
+            chronos_hostname=$(hostname -I | sed -e 's/  *//g'):7253
+            hs_hostname=hs.__zone__:8888
+            hs_provisioning_hostname=hs.__zone__:8889
+            ralf_hostname=ralf.__zone__:10888
+            xdms_hostname=homer.__zone__:7888
+            
+            # Local IP configuration
+            local_ip=$(hostname -I)
+            public_ip=__public_ip__
+            public_hostname=ellis.__zone__
+            
+            # Email server configuration
+            smtp_smarthost=localhost
+            smtp_username=username
+            smtp_password=password
+            email_recovery_sender=clearwater@example.org
+            
+            # Keys
+            signup_key=secret
+            turn_workaround=secret
+            ellis_api_key=secret
+            ellis_cookie_key=secret
             EOF
 
-            # Create basic zone configuration.
-            cat > /var/lib/bind/db.__zone__ << EOF
-            \$ORIGIN __zone__.
-            \$TTL 1h
-            @ IN SOA ns admin\@__zone__. ( $(date +%Y%m%d%H) 1d 2h 1w 30s )
-            @ NS ns
-            ns A __public_ip__
-            EOF
-            chown root:bind /var/lib/bind/db.__zone__
+            # Now install the software.
+            DEBIAN_FRONTEND=noninteractive apt-get install ellis --yes --force-yes
 
-            # Now that BIND configuration is correct, kick it to reload.
-            service bind9 reload
+            # Allocate a allocate a pool of numbers to assign to users.
+            /usr/share/clearwater/ellis/env/bin/python /usr/share/clearwater/ellis/src/metaswitch/ellis/tools/create_numbers.py --start __dn_range_start__ --count __dn_range_length__
+
+            # Update DNS
+            retries=0
+            while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
+            server __dns_ip__
+            update delete ellis.__zone__.
+            update add ellis.__zone__. 30 A __public_ip__
+            send
+            EOF
+            } && [ $retries -lt 10 ]
+            do
+              retries=$((retries + 1))
+              echo 'nsupdate failed - retrying (retry '$retries')...'
+              sleep 5
+            done
+
+            # Use the DNS server.
+            echo 'nameserver __dns_ip__' > /etc/dnsmasq.resolv.conf
+            echo 'RESOLV_CONF=/etc/dnsmasq.resolv.conf' >> /etc/default/dnsmasq
+            service dnsmasq force-reload
 
 outputs:
   public_ip:
@@ -131,9 +179,3 @@ outputs:
   private_ip:
     description: IP address in private network
     value: { get_attr: [ server, first_address ] }
-  zone:
-    description: DNS zone
-    value: { get_param: zone }
-  dnssec_key:
-    description: DNSSEC private key (Base64-encoded)
-    value: { get_param: dnssec_key }
