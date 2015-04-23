@@ -74,7 +74,7 @@ parameters:
   repo_url:
     type: string
     description: URL for Clearwater repository
-    default: http://repo.cw-ngv.com/mirw
+    default: http://repo.cw-ngv.com/stable
   zone:
     type: string
     description: DNS zone
@@ -93,10 +93,10 @@ parameters:
 
 resources:
   network:
-    type: http://localhost:8088/network.yaml
+    type: network.yaml
     properties:
       public_net_id: { get_param: public_net_id }
-      private_net_name: { str_replace: { params: { __stack__: { get_param: "AWS::StackName" } }, template: __stack__-private } }
+      private_net_name: { str_replace: { params: { __stack__: { get_param: "OS::stack_name" } }, template: __stack__-private } }
       private_net_cidr: { get_param: private_net_cidr }
       private_net_gateway: { get_param: private_net_gateway }
       private_net_pool_start: { get_param: private_net_pool_start }
@@ -104,7 +104,7 @@ resources:
       dns_ip: { get_param: external_dns_ip }
 
   dns:
-    type: http://localhost:8088/dns.yaml
+    type: dns.yaml
     properties:
       public_net_id: { get_param: public_net_id }
       private_net_id: { get_attr: [ network, private_net ] }
@@ -115,7 +115,7 @@ resources:
       dnssec_key: { get_param: dnssec_key }
 
   ellis:
-    type: http://localhost:8088/ellis.yaml
+    type: ellis.yaml
     properties:
       public_net_id: { get_param: public_net_id }
       private_net_id: { get_attr: [ network, private_net ] }
@@ -130,7 +130,7 @@ resources:
       dnssec_key: { get_param: dnssec_key }
 
   bono:
-    type: http://localhost:8088/bono.yaml
+    type: bono.yaml
     properties:
       public_net_id: { get_param: public_net_id }
       private_net_id: { get_attr: [ network, private_net ] }
@@ -143,7 +143,7 @@ resources:
       dnssec_key: { get_param: dnssec_key }
 
   sprout:
-    type: http://localhost:8088/sprout.yaml
+    type: sprout.yaml
     properties:
       public_net_id: { get_param: public_net_id }
       private_net_id: { get_attr: [ network, private_net ] }
@@ -156,7 +156,7 @@ resources:
       dnssec_key: { get_param: dnssec_key }
 
   homer:
-    type: http://localhost:8088/homer.yaml
+    type: homer.yaml
     properties:
       public_net_id: { get_param: public_net_id }
       private_net_id: { get_attr: [ network, private_net ] }
@@ -169,7 +169,7 @@ resources:
       dnssec_key: { get_param: dnssec_key }
 
   homestead:
-    type: http://localhost:8088/homestead.yaml
+    type: homestead.yaml
     properties:
       public_net_id: { get_param: public_net_id }
       private_net_id: { get_attr: [ network, private_net ] }
@@ -182,7 +182,7 @@ resources:
       dnssec_key: { get_param: dnssec_key }
 
   ralf:
-    type: http://localhost:8088/ralf.yaml
+    type: ralf.yaml
     properties:
       public_net_id: { get_param: public_net_id }
       private_net_id: { get_attr: [ network, private_net ] }
