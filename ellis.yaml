@@ -78,8 +78,12 @@ parameters:
     description: DNSSEC private key (Base64-encoded)
   etcd_ip:
     type: string
-    description: IP address of an existing member of the cluster
+    description: IP address of an existing member of the etcd cluster
     default: ""
+  index:
+    type: number
+    description: Index of this Ellis node in the Ellis cluster
+    default: 1
 
 resources:
   port:
@@ -96,7 +100,7 @@ resources:
   server:
     type: OS::Nova::Server
     properties:
-      name: { str_replace: { params: { __zone__: { get_param: zone } }, template: ellis.__zone__ } }
+      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: ellis-__index__.__zone__ } }
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
@@ -113,6 +117,7 @@ resources:
             __dns_ip__: { get_param: dns_ip }
             __dnssec_key__: { get_param: dnssec_key }
             __etcd_ip__ : { get_param: etcd_ip }
+            __index__ : { get_param: index }
           template: |
             #!/bin/bash
 
@@ -128,12 +133,13 @@ resources:
             cat > /etc/clearwater/local_config << EOF
             local_ip=$(hostname -I)
             public_ip=__public_ip__
-            public_hostname=ellis.__zone__
+            public_hostname=ellis-__index__.__zone__
             etcd_cluster=$etcd_ip
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management ellis --yes --force-yes
+            # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management ellis --yes --force-yes -o DPkg::options::=--force-confnew
 
             # Configure and upload /etc/clearwater/shared_config.
             cat > /etc/clearwater/shared_config << EOF
@@ -158,6 +164,7 @@ resources:
             ellis_cookie_key=secret
             EOF
             sudo /usr/share/clearwater/clearwater-config-manager/scripts/upload_shared_config
+            sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config
 
             # Allocate a allocate a pool of numbers to assign to users.
             /usr/share/clearwater/ellis/env/bin/python /usr/share/clearwater/ellis/src/metaswitch/ellis/tools/create_numbers.py --start __dn_range_start__ --count __dn_range_length__
@@ -166,6 +173,7 @@ resources:
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
             server __dns_ip__
+            update add ellis-__index__.__zone__. 30 A __public_ip__
             update add ellis.__zone__. 30 A __public_ip__
             send
             EOF
