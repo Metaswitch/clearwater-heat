@@ -141,6 +141,7 @@ resources:
       zone: { get_param: zone }
       dns_ip: { get_attr: [ dns, private_ip ] }
       dnssec_key: { get_param: dnssec_key }
+      etcd_ip: { get_attr: [ ellis, private_ip ] }
 
   sprout:
     type: sprout.yaml
@@ -154,6 +155,7 @@ resources:
       zone: { get_param: zone }
       dns_ip: { get_attr: [ dns, private_ip ] }
       dnssec_key: { get_param: dnssec_key }
+      etcd_ip: { get_attr: [ ellis, private_ip ] }
 
   homer:
     type: homer.yaml
@@ -167,6 +169,7 @@ resources:
       zone: { get_param: zone }
       dns_ip: { get_attr: [ dns, private_ip ] }
       dnssec_key: { get_param: dnssec_key }
+      etcd_ip: { get_attr: [ ellis, private_ip ] }
 
   homestead:
     type: homestead.yaml
@@ -180,6 +183,7 @@ resources:
       zone: { get_param: zone }
       dns_ip: { get_attr: [ dns, private_ip ] }
       dnssec_key: { get_param: dnssec_key }
+      etcd_ip: { get_attr: [ ellis, private_ip ] }
 
   ralf:
     type: ralf.yaml
@@ -193,6 +197,7 @@ resources:
       zone: { get_param: zone }
       dns_ip: { get_attr: [ dns, private_ip ] }
       dnssec_key: { get_param: dnssec_key }
+      etcd_ip: { get_attr: [ ellis, private_ip ] }
 
 outputs:
   zone:

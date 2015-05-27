@@ -68,6 +68,10 @@ parameters:
   dnssec_key:
     type: string
     description: DNSSEC private key (Base64-encoded)
+  etcd_ip:
+    type: string
+    description: IP address of an existing member of the cluster
+    default: ""
 
 resources:
   port:
@@ -98,6 +102,7 @@ resources:
             __public_ip__: { get_attr: [ floating_ip, floating_ip_address ] }
             __dns_ip__: { get_param: dns_ip }
             __dnssec_key__: { get_param: dnssec_key }
+            __etcd_ip__ : { get_param: etcd_ip }
           template: |
             #!/bin/bash
 
@@ -106,44 +111,24 @@ resources:
             curl -L http://repo.cw-ngv.com/repo_key | apt-key add -
             apt-get update
 
-            # Configure /etc/clearwater/config.
+            # Configure /etc/clearwater/local_config.
             mkdir -p /etc/clearwater
-            cat > /etc/clearwater/config << EOF
-            # Deployment definitions
-            home_domain=__zone__
-            sprout_hostname=sprout.__zone__
-            chronos_hostname=$(hostname -I | sed -e 's/  *//g'):7253
-            hs_hostname=hs.__zone__:8888
-            hs_provisioning_hostname=hs.__zone__:8889
-            ralf_hostname=ralf.__zone__:10888
-            xdms_hostname=homer.__zone__:7888
-            
-            # Local IP configuration
+            etcd_ip=__etcd_ip__
+            [ -n "$etcd_ip" ] || etcd_ip=$(hostname -I)
+            cat > /etc/clearwater/local_config << EOF
             local_ip=$(hostname -I)
             public_ip=__public_ip__
             public_hostname=ralf.__zone__
-            
-            # Email server configuration
-            smtp_smarthost=localhost
-            smtp_username=username
-            smtp_password=password
-            email_recovery_sender=clearwater@example.org
-            
-            # Keys
-            signup_key=secret
-            turn_workaround=secret
-            ellis_api_key=secret
-            ellis_cookie_key=secret
+            etcd_cluster=$etcd_ip
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install ralf --yes --force-yes
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management ralf --yes --force-yes
 
             # Update DNS
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
             server __dns_ip__
-            update delete ralf.__zone__.
             update add ralf.__zone__. 30 A __public_ip__
             send
             EOF

@@ -76,6 +76,10 @@ parameters:
   dnssec_key:
     type: string
     description: DNSSEC private key (Base64-encoded)
+  etcd_ip:
+    type: string
+    description: IP address of an existing member of the cluster
+    default: ""
 
 resources:
   port:
@@ -108,6 +112,7 @@ resources:
             __dn_range_length__: { get_param: dn_range_length }
             __dns_ip__: { get_param: dns_ip }
             __dnssec_key__: { get_param: dnssec_key }
+            __etcd_ip__ : { get_param: etcd_ip }
           template: |
             #!/bin/bash
 
@@ -116,22 +121,29 @@ resources:
             curl -L http://repo.cw-ngv.com/repo_key | apt-key add -
             apt-get update
 
-            # Configure /etc/clearwater/config.
+            # Configure /etc/clearwater/local_config.
             mkdir -p /etc/clearwater
-            cat > /etc/clearwater/config << EOF
+            etcd_ip=__etcd_ip__
+            [ -n "$etcd_ip" ] || etcd_ip=$(hostname -I)
+            cat > /etc/clearwater/local_config << EOF
+            local_ip=$(hostname -I)
+            public_ip=__public_ip__
+            public_hostname=ellis.__zone__
+            etcd_cluster=$etcd_ip
+            EOF
+
+            # Now install the software.
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management ellis --yes --force-yes
+
+            # Configure and upload /etc/clearwater/shared_config.
+            cat > /etc/clearwater/shared_config << EOF
             # Deployment definitions
             home_domain=__zone__
             sprout_hostname=sprout.__zone__
-            chronos_hostname=$(hostname -I | sed -e 's/  *//g'):7253
             hs_hostname=hs.__zone__:8888
             hs_provisioning_hostname=hs.__zone__:8889
             ralf_hostname=ralf.__zone__:10888
             xdms_hostname=homer.__zone__:7888
-            
-            # Local IP configuration
-            local_ip=$(hostname -I)
-            public_ip=__public_ip__
-            public_hostname=ellis.__zone__
             
             # Email server configuration
             smtp_smarthost=localhost
@@ -145,9 +157,7 @@ resources:
             ellis_api_key=secret
             ellis_cookie_key=secret
             EOF
-
-            # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install ellis --yes --force-yes
+            sudo /usr/share/clearwater/clearwater-config-manager/scripts/upload_shared_config
 
             # Allocate a allocate a pool of numbers to assign to users.
             /usr/share/clearwater/ellis/env/bin/python /usr/share/clearwater/ellis/src/metaswitch/ellis/tools/create_numbers.py --start __dn_range_start__ --count __dn_range_length__
@@ -156,7 +166,6 @@ resources:
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
             server __dns_ip__
-            update delete ellis.__zone__.
             update add ellis.__zone__. 30 A __public_ip__
             send
             EOF
