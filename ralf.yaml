@@ -75,7 +75,7 @@ parameters:
   index:
     type: number
     description: Index of this Ralf node in the Ralf cluster
-    default: 1
+    default: 0
 
 resources:
   port:
@@ -110,6 +110,9 @@ resources:
             __index__ : { get_param: index }
           template: |
             #!/bin/bash
+
+            # Log all output to file.
+            exec > >(tee -a /var/log/clearwater-heat-ralf.log) 2>&1
 
             # Configure the APT software source.
             echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list

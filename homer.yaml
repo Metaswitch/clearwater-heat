@@ -75,7 +75,7 @@ parameters:
   index:
     type: number
     description: Index of this Homer node in the Homer cluster
-    default: 1
+    default: 0
 
 resources:
   port:
@@ -111,6 +111,9 @@ resources:
           template: |
             #!/bin/bash
 
+            # Log all output to file.
+            exec > >(tee -a /var/log/clearwater-heat-homer.log) 2>&1
+
             # Configure the APT software source.
             echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
             curl -L http://repo.cw-ngv.com/repo_key | apt-key add -
@@ -130,7 +133,6 @@ resources:
             # Now install the software.
             # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-cassandra --yes --force-yes -o DPkg::options::=--force-confnew
-            rm -f /etc/ca-certificates/update.d/jks-keystore
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management homer --yes --force-yes -o DPkg::options::=--force-confnew
 
             # Update DNS
