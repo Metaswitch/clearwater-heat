@@ -39,21 +39,33 @@ parameters:
   public_net_id:
     type: string
     description: ID of public network
+    constraints:
+      - custom_constraint: neutron.network
+        description: Must be a valid network ID
   private_net_id:
     type: string
     description: ID of private network
+    constraints:
+      - custom_constraint: neutron.network
+        description: Must be a valid network ID
   flavor:
     type: string
     description: Flavor to use
-    default: m1.small
+    constraints:
+      - custom_constraint: nova.flavor
+        description: Must be a valid flavor name
   image:
     type: string
     description: Name of image to use
-    default: trusty-server-cloudimg-amd64
+    constraints:
+      - custom_constraint: glance.image
+        description: Must be a valid image name
   key_name:
     type: string
     description: Name of keypair to assign
-    default: keypair
+    constraints:
+      - custom_constraint: nova.keypair
+        description: Must be a valid keypair name
   repo_url:
     type: string
     description: URL for Clearwater repository
@@ -68,6 +80,9 @@ parameters:
   dnssec_key:
     type: string
     description: DNSSEC private key (Base64-encoded)
+    constraints:
+      - allowed_pattern: "[0-9A-Za-z+/=]+"
+        description: Must be Base64-encoded
   etcd_ip:
     type: string
     description: IP address of an existing member of the etcd cluster
