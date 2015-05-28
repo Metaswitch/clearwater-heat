@@ -133,7 +133,8 @@ resources:
             # Now install the software.
             # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-cassandra --yes --force-yes -o DPkg::options::=--force-confnew
-            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management homestead homestead-prov --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install homestead homestead-prov --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
             # Update DNS
             retries=0
