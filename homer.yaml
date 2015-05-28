@@ -70,8 +70,12 @@ parameters:
     description: DNSSEC private key (Base64-encoded)
   etcd_ip:
     type: string
-    description: IP address of an existing member of the cluster
+    description: IP address of an existing member of the etcd cluster
     default: ""
+  index:
+    type: number
+    description: Index of this Homer node in the Homer cluster
+    default: 0
 
 resources:
   port:
@@ -88,7 +92,7 @@ resources:
   server:
     type: OS::Nova::Server
     properties:
-      name: { str_replace: { params: { __zone__: { get_param: zone } }, template: homer.__zone__ } }
+      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: homer-__index__.__zone__ } }
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
@@ -103,8 +107,12 @@ resources:
             __dns_ip__: { get_param: dns_ip }
             __dnssec_key__: { get_param: dnssec_key }
             __etcd_ip__ : { get_param: etcd_ip }
+            __index__ : { get_param: index }
           template: |
             #!/bin/bash
+
+            # Log all output to file.
+            exec > >(tee -a /var/log/clearwater-heat-homer.log) 2>&1
 
             # Configure the APT software source.
             echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
@@ -118,19 +126,22 @@ resources:
             cat > /etc/clearwater/local_config << EOF
             local_ip=$(hostname -I)
             public_ip=__public_ip__
-            public_hostname=homer.__zone__
+            public_hostname=homer-__index__.__zone__
             etcd_cluster=$etcd_ip
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-cassandra --yes --force-yes
-            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management homer --yes --force-yes
+            # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-cassandra --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install homer --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
             # Update DNS
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
             server __dns_ip__
-            update add homer.__zone__. 30 A __public_ip__
+            update add homer-__index__.__zone__. 30 A __public_ip__
+            update add homer.__zone__. 30 A $(hostname -I)
             send
             EOF
             } && [ $retries -lt 10 ]

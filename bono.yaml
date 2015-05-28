@@ -70,8 +70,12 @@ parameters:
     description: DNSSEC private key (Base64-encoded)
   etcd_ip:
     type: string
-    description: IP address of an existing member of the cluster
+    description: IP address of an existing member of the etcd cluster
     default: ""
+  index:
+    type: number
+    description: Index of this Bono node in the Bono cluster
+    default: 0
 
 resources:
   port:
@@ -88,7 +92,7 @@ resources:
   server:
     type: OS::Nova::Server
     properties:
-      name: { str_replace: { params: { __zone__: { get_param: zone } }, template: bono.__zone__ } }
+      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: bono-__index__.__zone__ } }
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
@@ -103,8 +107,12 @@ resources:
             __dns_ip__: { get_param: dns_ip }
             __dnssec_key__: { get_param: dnssec_key }
             __etcd_ip__ : { get_param: etcd_ip }
+            __index__ : { get_param: index }
           template: |
             #!/bin/bash
+
+            # Log all output to file.
+            exec > >(tee -a /var/log/clearwater-heat-bono.log) 2>&1
 
             # Configure the APT software source.
             echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
@@ -118,18 +126,25 @@ resources:
             cat > /etc/clearwater/local_config << EOF
             local_ip=$(hostname -I)
             public_ip=__public_ip__
-            public_hostname=bono.__zone__
+            public_hostname=bono-__index__.__zone__
             etcd_cluster=$etcd_ip
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management bono --yes --force-yes
+            # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
+            DEBIAN_FRONTEND=noninteractive apt-get install bono --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-config-manager --yes --force-yes
 
             # Update DNS
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
             server __dns_ip__
-            update add bono.__zone__. 30 A __public_ip__
+            update add bono-__index__.__zone__. 30 A __public_ip__
+            update add __zone__. 30 A __public_ip__
+            update add __zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.__zone__.
+            update add __zone__. 30 NAPTR 0 0 "s" "SIP+D2U" "" _sip._udp.__zone__.
+            update add _sip._tcp.__zone__. 30 SRV 0 0 5060 bono-__index__.__zone__.
+            update add _sip._udp.__zone__. 30 SRV 0 0 5060 bono-__index__.__zone__.
             send
             EOF
             } && [ $retries -lt 10 ]

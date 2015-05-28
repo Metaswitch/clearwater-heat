@@ -93,6 +93,7 @@ resources:
             #!/bin/bash
 
             # Install BIND.
+            apt-get update
             DEBIAN_FRONTEND=noninteractive apt-get install bind9 --yes
 
             # Update BIND configuration with the specified zone and key.

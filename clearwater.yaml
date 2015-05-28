@@ -90,6 +90,26 @@ parameters:
   dnssec_key:
     type: string
     description: DNSSEC private key (Base64-encoded)
+  bono_cluster_size:
+    type: number
+    description: Number of Bono nodes in Bono cluster
+    default: 1
+  sprout_cluster_size:
+    type: number
+    description: Number of Sprout nodes in Sprout cluster
+    default: 1
+  homer_cluster_size:
+    type: number
+    description: Number of Homer nodes in Homer cluster
+    default: 1
+  homestead_cluster_size:
+    type: number
+    description: Number of Homestead nodes in Homestead cluster
+    default: 1
+  ralf_cluster_size:
+    type: number
+    description: Number of Ralf nodes in Ralf cluster
+    default: 1
 
 resources:
   network:
@@ -130,74 +150,104 @@ resources:
       dnssec_key: { get_param: dnssec_key }
 
   bono:
-    type: bono.yaml
+    type: OS::Heat::ResourceGroup
     properties:
-      public_net_id: { get_param: public_net_id }
-      private_net_id: { get_attr: [ network, private_net ] }
-      flavor: { get_param: flavor }
-      image: { get_param: image }
-      key_name: { get_param: key_name }
-      repo_url: { get_param: repo_url }
-      zone: { get_param: zone }
-      dns_ip: { get_attr: [ dns, private_ip ] }
-      dnssec_key: { get_param: dnssec_key }
-      etcd_ip: { get_attr: [ ellis, private_ip ] }
+      count: { get_param: bono_cluster_size }
+      index_var: "__index__"
+      resource_def:
+        type: bono.yaml
+        properties:
+          public_net_id: { get_param: public_net_id }
+          private_net_id: { get_attr: [ network, private_net ] }
+          flavor: { get_param: flavor }
+          image: { get_param: image }
+          key_name: { get_param: key_name }
+          repo_url: { get_param: repo_url }
+          zone: { get_param: zone }
+          dns_ip: { get_attr: [ dns, private_ip ] }
+          dnssec_key: { get_param: dnssec_key }
+          etcd_ip: { get_attr: [ ellis, private_ip ] }
+          index: __index__
 
   sprout:
-    type: sprout.yaml
+    type: OS::Heat::ResourceGroup
     properties:
-      public_net_id: { get_param: public_net_id }
-      private_net_id: { get_attr: [ network, private_net ] }
-      flavor: { get_param: flavor }
-      image: { get_param: image }
-      key_name: { get_param: key_name }
-      repo_url: { get_param: repo_url }
-      zone: { get_param: zone }
-      dns_ip: { get_attr: [ dns, private_ip ] }
-      dnssec_key: { get_param: dnssec_key }
-      etcd_ip: { get_attr: [ ellis, private_ip ] }
+      count: { get_param: sprout_cluster_size }
+      index_var: __index__
+      resource_def:
+        type: sprout.yaml
+        properties:
+          public_net_id: { get_param: public_net_id }
+          private_net_id: { get_attr: [ network, private_net ] }
+          flavor: { get_param: flavor }
+          image: { get_param: image }
+          key_name: { get_param: key_name }
+          repo_url: { get_param: repo_url }
+          zone: { get_param: zone }
+          dns_ip: { get_attr: [ dns, private_ip ] }
+          dnssec_key: { get_param: dnssec_key }
+          etcd_ip: { get_attr: [ ellis, private_ip ] }
+          index: __index__
 
   homer:
-    type: homer.yaml
+    type: OS::Heat::ResourceGroup
     properties:
-      public_net_id: { get_param: public_net_id }
-      private_net_id: { get_attr: [ network, private_net ] }
-      flavor: { get_param: flavor }
-      image: { get_param: image }
-      key_name: { get_param: key_name }
-      repo_url: { get_param: repo_url }
-      zone: { get_param: zone }
-      dns_ip: { get_attr: [ dns, private_ip ] }
-      dnssec_key: { get_param: dnssec_key }
-      etcd_ip: { get_attr: [ ellis, private_ip ] }
+      count: { get_param: homer_cluster_size }
+      index_var: __index__
+      resource_def:
+        type: homer.yaml
+        properties:
+          public_net_id: { get_param: public_net_id }
+          private_net_id: { get_attr: [ network, private_net ] }
+          flavor: { get_param: flavor }
+          image: { get_param: image }
+          key_name: { get_param: key_name }
+          repo_url: { get_param: repo_url }
+          zone: { get_param: zone }
+          dns_ip: { get_attr: [ dns, private_ip ] }
+          dnssec_key: { get_param: dnssec_key }
+          etcd_ip: { get_attr: [ ellis, private_ip ] }
+          index: __index__
 
   homestead:
-    type: homestead.yaml
+    type: OS::Heat::ResourceGroup
     properties:
-      public_net_id: { get_param: public_net_id }
-      private_net_id: { get_attr: [ network, private_net ] }
-      flavor: { get_param: flavor }
-      image: { get_param: image }
-      key_name: { get_param: key_name }
-      repo_url: { get_param: repo_url }
-      zone: { get_param: zone }
-      dns_ip: { get_attr: [ dns, private_ip ] }
-      dnssec_key: { get_param: dnssec_key }
-      etcd_ip: { get_attr: [ ellis, private_ip ] }
+      count: { get_param: homestead_cluster_size }
+      index_var: __index__
+      resource_def:
+        type: homestead.yaml
+        properties:
+          public_net_id: { get_param: public_net_id }
+          private_net_id: { get_attr: [ network, private_net ] }
+          flavor: { get_param: flavor }
+          image: { get_param: image }
+          key_name: { get_param: key_name }
+          repo_url: { get_param: repo_url }
+          zone: { get_param: zone }
+          dns_ip: { get_attr: [ dns, private_ip ] }
+          dnssec_key: { get_param: dnssec_key }
+          etcd_ip: { get_attr: [ ellis, private_ip ] }
+          index: __index__
 
   ralf:
-    type: ralf.yaml
+    type: OS::Heat::ResourceGroup
     properties:
-      public_net_id: { get_param: public_net_id }
-      private_net_id: { get_attr: [ network, private_net ] }
-      flavor: { get_param: flavor }
-      image: { get_param: image }
-      key_name: { get_param: key_name }
-      repo_url: { get_param: repo_url }
-      zone: { get_param: zone }
-      dns_ip: { get_attr: [ dns, private_ip ] }
-      dnssec_key: { get_param: dnssec_key }
-      etcd_ip: { get_attr: [ ellis, private_ip ] }
+      count: { get_param: ralf_cluster_size }
+      index_var: __index__
+      resource_def:
+        type: ralf.yaml
+        properties:
+          public_net_id: { get_param: public_net_id }
+          private_net_id: { get_attr: [ network, private_net ] }
+          flavor: { get_param: flavor }
+          image: { get_param: image }
+          key_name: { get_param: key_name }
+          repo_url: { get_param: repo_url }
+          zone: { get_param: zone }
+          dns_ip: { get_attr: [ dns, private_ip ] }
+          dnssec_key: { get_param: dnssec_key }
+          etcd_ip: { get_attr: [ ellis, private_ip ] }
+          index: __index__
 
 outputs:
   zone:
