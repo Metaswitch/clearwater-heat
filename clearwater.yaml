@@ -39,6 +39,9 @@ parameters:
   public_net_id:
     type: string
     description: ID of public network
+    constraints:
+      - custom_constraint: neutron.network
+        description: Must be a valid network ID
   private_net_cidr:
     type: string
     description: Private network address (CIDR notation)
@@ -62,15 +65,21 @@ parameters:
   flavor:
     type: string
     description: Flavor to use
-    default: m1.small
+    constraints:
+      - custom_constraint: nova.flavor
+        description: Must be a valid flavor name
   image:
     type: string
     description: Name of image to use
-    default: trusty-server-cloudimg-amd64
+    constraints:
+      - custom_constraint: glance.image
+        description: Must be a valid image name
   key_name:
     type: string
     description: Name of keypair to assign
-    default: keypair
+    constraints:
+      - custom_constraint: nova.keypair
+        description: Must be a valid keypair name
   repo_url:
     type: string
     description: URL for Clearwater repository
@@ -83,13 +92,22 @@ parameters:
     type: string
     description: First directory number in pool
     default: "6505550000"
+    constraints:
+      - allowed_pattern: "[0-9]+"
+        description: Must be numeric
   dn_range_length:
     type: string
     description: Number of directory numbers to add to pool
     default: "1000"
+    constraints:
+      - allowed_pattern: "[0-9]+"
+        description: Must be numeric
   dnssec_key:
     type: string
     description: DNSSEC private key (Base64-encoded)
+    constraints:
+      - allowed_pattern: "[0-9A-Za-z+/=]+"
+        description: Must be Base64-encoded
   bono_cluster_size:
     type: number
     description: Number of Bono nodes in Bono cluster
