@@ -39,6 +39,9 @@ parameters:
   public_net_id:
     type: string
     description: ID of public network
+    constraints:
+      - custom_constraint: neutron.network
+        description: Must be a valid network ID
   private_net_name:
     type: string
     description: Name of private network
