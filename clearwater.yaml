@@ -131,7 +131,7 @@ parameters:
 
 resources:
   network:
-    type: network.yaml
+    type: ./network.yaml
     properties:
       public_net_id: { get_param: public_net_id }
       private_net_name: { str_replace: { params: { __stack__: { get_param: "OS::stack_name" } }, template: __stack__-private } }
@@ -142,7 +142,7 @@ resources:
       dns_ip: { get_param: external_dns_ip }
 
   dns:
-    type: dns.yaml
+    type: ./dns.yaml
     properties:
       public_net_id: { get_param: public_net_id }
       private_net_id: { get_attr: [ network, private_net ] }
@@ -153,7 +153,7 @@ resources:
       dnssec_key: { get_param: dnssec_key }
 
   ellis:
-    type: ellis.yaml
+    type: ./ellis.yaml
     properties:
       public_net_id: { get_param: public_net_id }
       private_net_id: { get_attr: [ network, private_net ] }
@@ -173,7 +173,7 @@ resources:
       count: { get_param: bono_cluster_size }
       index_var: "__index__"
       resource_def:
-        type: bono.yaml
+        type: ./bono.yaml
         properties:
           public_net_id: { get_param: public_net_id }
           private_net_id: { get_attr: [ network, private_net ] }
@@ -193,7 +193,7 @@ resources:
       count: { get_param: sprout_cluster_size }
       index_var: __index__
       resource_def:
-        type: sprout.yaml
+        type: ./sprout.yaml
         properties:
           public_net_id: { get_param: public_net_id }
           private_net_id: { get_attr: [ network, private_net ] }
@@ -213,7 +213,7 @@ resources:
       count: { get_param: homer_cluster_size }
       index_var: __index__
       resource_def:
-        type: homer.yaml
+        type: ./homer.yaml
         properties:
           public_net_id: { get_param: public_net_id }
           private_net_id: { get_attr: [ network, private_net ] }
@@ -233,7 +233,7 @@ resources:
       count: { get_param: homestead_cluster_size }
       index_var: __index__
       resource_def:
-        type: homestead.yaml
+        type: ./homestead.yaml
         properties:
           public_net_id: { get_param: public_net_id }
           private_net_id: { get_attr: [ network, private_net ] }
@@ -253,7 +253,7 @@ resources:
       count: { get_param: ralf_cluster_size }
       index_var: __index__
       resource_def:
-        type: ralf.yaml
+        type: ./ralf.yaml
         properties:
           public_net_id: { get_param: public_net_id }
           private_net_id: { get_attr: [ network, private_net ] }
