@@ -141,6 +141,11 @@ resources:
       private_net_pool_end: { get_param: private_net_pool_end }
       dns_ip: { get_param: external_dns_ip }
 
+  security_groups:
+    type: ./security-groups.yaml
+    properties:
+      name_prefix: { get_param: "OS::stack_name" }
+
   dns:
     type: ./dns.yaml
     properties:
@@ -149,6 +154,7 @@ resources:
       flavor: { get_param: flavor }
       image: { get_param: image }
       key_name: { get_param: key_name }
+      dns_security_group: { get_attr: [ security_groups, dns ] }
       zone: { get_param: zone }
       dnssec_key: { get_param: dnssec_key }
 
@@ -160,6 +166,8 @@ resources:
       flavor: { get_param: flavor }
       image: { get_param: image }
       key_name: { get_param: key_name }
+      base_security_group: { get_attr: [ security_groups, base ] }
+      ellis_security_group: { get_attr: [ security_groups, ellis ] }
       repo_url: { get_param: repo_url }
       zone: { get_param: zone }
       dn_range_start: { get_param: dn_range_start }
@@ -180,6 +188,8 @@ resources:
           flavor: { get_param: flavor }
           image: { get_param: image }
           key_name: { get_param: key_name }
+          base_security_group: { get_attr: [ security_groups, base ] }
+          bono_security_group: { get_attr: [ security_groups, bono ] }
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_ip: { get_attr: [ dns, private_ip ] }
@@ -200,6 +210,9 @@ resources:
           flavor: { get_param: flavor }
           image: { get_param: image }
           key_name: { get_param: key_name }
+          base_security_group: { get_attr: [ security_groups, base ] }
+          sprout_security_group: { get_attr: [ security_groups, sprout ] }
+          sprout2_security_group: { get_attr: [ security_groups, sprout2 ] }
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_ip: { get_attr: [ dns, private_ip ] }
@@ -220,6 +233,8 @@ resources:
           flavor: { get_param: flavor }
           image: { get_param: image }
           key_name: { get_param: key_name }
+          base_security_group: { get_attr: [ security_groups, base ] }
+          homer_security_group: { get_attr: [ security_groups, homer ] }
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_ip: { get_attr: [ dns, private_ip ] }
@@ -240,6 +255,8 @@ resources:
           flavor: { get_param: flavor }
           image: { get_param: image }
           key_name: { get_param: key_name }
+          base_security_group: { get_attr: [ security_groups, base ] }
+          homestead_security_group: { get_attr: [ security_groups, homestead ] }
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_ip: { get_attr: [ dns, private_ip ] }
@@ -260,6 +277,8 @@ resources:
           flavor: { get_param: flavor }
           image: { get_param: image }
           key_name: { get_param: key_name }
+          base_security_group: { get_attr: [ security_groups, base ] }
+          ralf_security_group: { get_attr: [ security_groups, ralf ] }
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_ip: { get_attr: [ dns, private_ip ] }

@@ -66,6 +66,9 @@ parameters:
     constraints:
       - custom_constraint: nova.keypair
         description: Must be a valid keypair name
+  dns_security_group:
+    type: string
+    description: ID of security group for DNS nodes
   zone:
     type: string
     description: DNS zone
@@ -79,6 +82,8 @@ resources:
     type: OS::Neutron::Port
     properties:
       network_id: { get_param: private_net_id }
+      security_groups:
+        - { get_param: dns_security_group }
 
   floating_ip:
     type: OS::Neutron::FloatingIP
