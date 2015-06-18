@@ -6,6 +6,7 @@ This repository contains templates for use with [OpenStack Heat](https://wiki.op
 
 To use them, you must
 
+-   have an [Ubuntu cloud image](http://cloud-images.ubuntu.com/) imported into your OpenStack deployment
 -   identify the external network in OpenStack that Clearwater should hang off, and find its network ID
 -   create a DNS private key by running `head -c 64 /dev/random | base64`
 -   create the stack by running `heat stack-create clearwater -f clearwater.yaml -P "public_net_id=...;dnssec_key=..."`.
