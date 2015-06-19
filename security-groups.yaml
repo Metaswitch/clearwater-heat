@@ -1,0 +1,349 @@
+# Project Clearwater - IMS in the Cloud
+# Copyright (C) 2015  Metaswitch Networks Ltd
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version, along with the "Special Exception" for use of
+# the program along with SSL, set forth below. This program is distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+# without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details. You should have received a copy of the GNU General Public
+# License along with this program.  If not, see
+# <http://www.gnu.org/licenses/>.
+#
+# The author can be reached by email at clearwater@metaswitch.com or by
+# post at Metaswitch Networks Ltd, 100 Church St, Enfield EN2 6BQ, UK
+#
+# Special Exception
+# Metaswitch Networks Ltd  grants you permission to copy, modify,
+# propagate, and distribute a work formed by combining OpenSSL with The
+# Software, or a work derivative of such a combination, even if such
+# copying, modification, propagation, or distribution would otherwise
+# violate the terms of the GPL. You must comply with the GPL in all
+# respects for all of the code used other than OpenSSL.
+# "OpenSSL" means OpenSSL toolkit software distributed by the OpenSSL
+# Project and licensed under the OpenSSL Licenses, or a work based on such
+# software and licensed under the OpenSSL Licenses.
+# "OpenSSL Licenses" means the OpenSSL License and Original SSLeay License
+# under which the OpenSSL Project distributes the OpenSSL toolkit software,
+# as those licenses appear in the file LICENSE-OPENSSL.
+
+heat_template_version: 2013-05-23
+
+description: >
+  Security Groups for Clearwater to use
+
+parameters:
+  name_prefix:
+    type: string
+    description: Security group name prefix
+    default: clearwater
+
+resources:
+  base:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-base } }
+      description: Base security group for all Clearwater nodes
+      rules:
+        # All egress traffic
+        - direction: egress
+          ethertype: IPv4
+        - direction: egress
+          ethertype: IPv6
+        # ICMP
+        - protocol: icmp
+        # SSH
+        - protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+        # SNMP
+        - protocol: udp
+          port_range_min: 161
+          port_range_max: 161
+        # etcd
+        - protocol: tcp
+          port_range_min: 2380
+          port_range_max: 2380
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: base } # omit remote_group_id to reference yourself
+        - protocol: tcp
+          port_range_min: 4000
+          port_range_max: 4000
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: base } # omit remote_group_id to reference yourself
+
+  dns:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-dns } }
+      description: Security group for DNS nodes
+      rules:
+        # All egress traffic
+        - direction: egress
+          ethertype: IPv4
+        - direction: egress
+          ethertype: IPv6
+        # ICMP
+        - protocol: icmp
+        # SSH
+        - protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+        # DNS
+        - protocol: udp
+          port_range_min: 53
+          port_range_max: 53
+        - protocol: tcp
+          port_range_min: 53
+          port_range_max: 53
+
+  ellis:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-ellis } }
+      description: Security group for Ellis nodes
+      rules:
+        # HTTP
+        - protocol: tcp
+          port_range_min: 80
+          port_range_max: 80
+        # HTTPS
+        - protocol: tcp
+          port_range_min: 443
+          port_range_max: 443
+
+  bono:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-bono } }
+      description: Security group for Bono nodes
+      rules:
+        # STUN/TURN
+        - protocol: udp
+          port_range_min: 3478
+          port_range_max: 3478
+        - protocol: tcp
+          port_range_min: 3478
+          port_range_max: 3478
+        # Internal SIP
+        - protocol: tcp
+          port_range_min: 5058
+          port_range_max: 5058
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: bono } # omit remote_group_id to reference yourself
+        - protocol: tcp
+          port_range_min: 5058
+          port_range_max: 5058
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: sprout }
+        # External SIP
+        - protocol: udp
+          port_range_min: 5060
+          port_range_max: 5060
+        - protocol: tcp
+          port_range_min: 5060
+          port_range_max: 5060
+        # External SIP/WebSocket
+        - protocol: tcp
+          port_range_min: 5062
+          port_range_max: 5062
+        # RTP
+        - protocol: udp
+          port_range_min: 32768
+          port_range_max: 65535
+
+
+  sprout:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-sprout } }
+      description: Security group for Sprout nodes
+      rules:
+        # Internal SIP
+        - protocol: tcp
+          port_range_min: 5052
+          port_range_max: 5052
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+        - protocol: tcp
+          port_range_min: 5054
+          port_range_max: 5054
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+        # Chronos
+        - protocol: tcp
+          port_range_min: 7253
+          port_range_max: 7253
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+        # Chronos timer pops
+        - protocol: tcp
+          port_range_min: 9888
+          port_range_max: 9888
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+        # Memcached
+        - protocol: tcp
+          port_range_min: 11211
+          port_range_max: 11211
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+
+  sprout2:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-sprout2 } }
+      description: Additional security group for Sprout nodes (required to avoid circular dependency)
+      #            Specifically, Bono and Sprout depend on each other, as do Sprout and Homestead.  By dividing Sprout's
+      #            security group into one for other nodes to depend on (sprout) and a second to depend on other nodes
+      #            (sprout2), we break this cycle.
+      rules:
+        # Internal SIP
+        - protocol: tcp
+          port_range_min: 5052
+          port_range_max: 5052
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: bono }
+        - protocol: tcp
+          port_range_min: 5054
+          port_range_max: 5054
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: bono }
+        # Notifications from Homestead
+        - protocol: tcp
+          port_range_min: 9888
+          port_range_max: 9888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: homestead }
+
+  homer:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-homer } }
+      description: Security group for Homer nodes
+      rules:
+        # Ut/HTTP
+        - protocol: tcp
+          port_range_min: 7888
+          port_range_max: 7888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: ellis }
+        - protocol: tcp
+          port_range_min: 7888
+          port_range_max: 7888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: sprout }
+        # Cassandra
+        - protocol: tcp
+          port_range_min: 7000
+          port_range_max: 7000
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: homer } # omit remote_group_id to reference yourself
+        - protocol: tcp
+          port_range_min: 9160
+          port_range_max: 9160
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: homer } # omit remote_group_id to reference yourself
+
+  homestead:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-homestead } }
+      description: Security group for Homestead nodes
+      rules:
+        # Cx-like HTTP API
+        - protocol: tcp
+          port_range_min: 8888
+          port_range_max: 8888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: bono }
+        - protocol: tcp
+          port_range_min: 8888
+          port_range_max: 8888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: sprout }
+        # REST-ful Provisioning API
+        - protocol: tcp
+          port_range_min: 8889
+          port_range_max: 8889
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: ellis }
+        # Cassandra
+        - protocol: tcp
+          port_range_min: 7000
+          port_range_max: 7000
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: homestead } # omit remote_group_id to reference yourself
+        - protocol: tcp
+          port_range_min: 9160
+          port_range_max: 9160
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: homestead } # omit remote_group_id to reference yourself
+
+  ralf:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-ralf } }
+      description: Security group for Ralf nodes
+      rules:
+        # Rf-like/HTTP API
+        - protocol: tcp
+          port_range_min: 10888
+          port_range_max: 10888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: bono }
+        - protocol: tcp
+          port_range_min: 10888
+          port_range_max: 10888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: sprout }
+        # Chronos
+        - protocol: tcp
+          port_range_min: 7253
+          port_range_max: 7253
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: ralf } # omit remote_group_id to reference yourself
+        # Chronos timer pops
+        - protocol: tcp
+          port_range_min: 10888
+          port_range_max: 10888
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: ralf } # omit remote_group_id to reference yourself
+        # Memcached
+        - protocol: tcp
+          port_range_min: 11211
+          port_range_max: 11211
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: ralf } # omit remote_group_id to reference yourself
+
+outputs:
+  base:
+    description: Base security group for all Clearwater nodes
+    value: { get_resource: base } 
+  dns:
+    description: Security group for DNS nodes
+    value: { get_resource: dns }
+  ellis:
+    description: Security group for Ellis nodes
+    value: { get_resource: ellis }
+  bono:
+    description: Security group for Bono nodes
+    value: { get_resource: bono }
+  sprout:
+    description: Security group for Sprout nodes
+    value: { get_resource: sprout }
+  sprout2:
+    description: Additional security group for Sprout nodes
+    value: { get_resource: sprout2 }
+  homer:
+    description: Security group for Homer nodes
+    value: { get_resource: homer }
+  homestead:
+    description: Security group for Homestead nodes
+    value: { get_resource: homestead }
+  ralf:
+    description: Security group for Ralf nodes
+    value: { get_resource: ralf }

@@ -66,6 +66,12 @@ parameters:
     constraints:
       - custom_constraint: nova.keypair
         description: Must be a valid keypair name
+  base_security_group:
+    type: string
+    description: ID of base security group for all Clearwater nodes
+  homestead_security_group:
+    type: string
+    description: ID of security group for Homestead nodes
   repo_url:
     type: string
     description: URL for Clearwater repository
@@ -97,6 +103,9 @@ resources:
     type: OS::Neutron::Port
     properties:
       network_id: { get_param: private_net_id }
+      security_groups:
+        - { get_param: base_security_group }
+        - { get_param: homestead_security_group }
 
   floating_ip:
     type: OS::Neutron::FloatingIP
