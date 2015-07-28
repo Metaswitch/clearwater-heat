@@ -171,8 +171,7 @@ resources:
             EOF
 
             # Now install the software.
-            # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
-            DEBIAN_FRONTEND=noninteractive apt-get install ellis --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install ellis --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-config-manager --yes --force-yes
 
             # Configure and upload /etc/clearwater/shared_config.
