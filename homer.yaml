@@ -160,6 +160,10 @@ resources:
             DEBIAN_FRONTEND=noninteractive apt-get install homer --yes --force-yes -o DPkg::options::=--force-confnew
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
+            # Wait until etcd is up and running before applying the shared_config
+            /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
+            sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
+
             # Update DNS
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
