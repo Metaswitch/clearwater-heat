@@ -175,6 +175,9 @@ resources:
             DEBIAN_FRONTEND=noninteractive apt-get install ellis --yes --force-yes -o DPkg::options::=--force-confnew
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-config-manager --yes --force-yes
 
+            # Wait until etcd is up and running before uploading/adding the shared_config
+            /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
+
             # Configure and upload /etc/clearwater/shared_config.
             cat > /etc/clearwater/shared_config << EOF
             # Deployment definitions
@@ -198,7 +201,7 @@ resources:
             ellis_cookie_key=secret
             EOF
             sudo /usr/share/clearwater/clearwater-config-manager/scripts/upload_shared_config
-            sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config
+            sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
 
             # Allocate a allocate a pool of numbers to assign to users.
             /usr/share/clearwater/ellis/env/bin/python /usr/share/clearwater/ellis/src/metaswitch/ellis/tools/create_numbers.py --start __dn_range_start__ --count __dn_range_length__
