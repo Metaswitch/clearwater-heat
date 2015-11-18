@@ -130,161 +130,971 @@ parameters:
     default: 1
 
 resources:
-  network:
-    type: ./network.yaml
-    properties:
-      public_net_id: { get_param: public_net_id }
-      private_net_name: { str_replace: { params: { __stack__: { get_param: "OS::stack_name" } }, template: __stack__-private } }
-      private_net_cidr: { get_param: private_net_cidr }
-      private_net_gateway: { get_param: private_net_gateway }
-      private_net_pool_start: { get_param: private_net_pool_start }
-      private_net_pool_end: { get_param: private_net_pool_end }
-      dns_ip: { get_param: external_dns_ip }
 
-  security_groups:
-    type: ./security-groups.yaml
+  # From network.yaml...
+  network_private_net:
+    type: OS::Neutron::Net
     properties:
-      name_prefix: { get_param: "OS::stack_name" }
+      name: { str_replace: { params: { __stack__: { get_param: "OS::stack_name" } }, template: __stack__-private } }
 
-  dns:
-    type: ./dns.yaml
+  network_private_subnet:
+    type: OS::Neutron::Subnet
     properties:
-      public_net_id: { get_param: public_net_id }
-      private_net_id: { get_attr: [ network, private_net ] }
-      flavor: { get_param: flavor }
+      name: { str_replace: { params: { __stack__: { get_param: "OS::stack_name" } }, template: __stack__-private } }
+      network_id: { get_resource: network_private_net }
+      cidr: { get_param: private_net_cidr }
+      dns_nameservers: [ { get_param: external_dns_ip } ]
+      gateway_ip: { get_param: private_net_gateway }
+      allocation_pools:
+        - start: { get_param: private_net_pool_start }
+          end: { get_param: private_net_pool_end }
+
+  network_router:
+    type: OS::Neutron::Router
+    properties:
+      name: { str_replace: { params: { __stack__: { get_param: "OS::stack_name" } }, template: __stack__-private } }
+
+  network_router_gateway:
+    type: OS::Neutron::RouterGateway
+    properties:
+      router_id: { get_resource: network_router }
+      network_id: { get_param: public_net_id }
+
+  network_router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: network_router }
+      subnet_id: { get_resource: network_private_subnet }
+
+  # From security-groups.yaml...
+  security_groups_base:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "OS::stack_name" } }, template: __name_prefix__-base } }
+      description: Base security group for all Clearwater nodes
+      rules:
+        # All egress traffic
+        - direction: egress
+          ethertype: IPv4
+        - direction: egress
+          ethertype: IPv6
+        # ICMP
+        - protocol: icmp
+        # SSH
+        - protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+        # SNMP
+        - protocol: udp
+          port_range_min: 161
+          port_range_max: 161
+        # etcd
+        - protocol: tcp
+          port_range_min: 2380
+          port_range_max: 2380
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: base } # omit remote_group_id to reference yourself
+        - protocol: tcp
+          port_range_min: 4000
+          port_range_max: 4000
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: base } # omit remote_group_id to reference yourself
+
+  security_groups_dns:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "OS::stack_name" } }, template: __name_prefix__-dns } }
+      description: Security group for DNS nodes
+      rules:
+        # All egress traffic
+        - direction: egress
+          ethertype: IPv4
+        - direction: egress
+          ethertype: IPv6
+        # ICMP
+        - protocol: icmp
+        # SSH
+        - protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+        # DNS
+        - protocol: udp
+          port_range_min: 53
+          port_range_max: 53
+        - protocol: tcp
+          port_range_min: 53
+          port_range_max: 53
+
+  security_groups_ellis:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "OS::stack_name" } }, template: __name_prefix__-ellis } }
+      description: Security group for Ellis nodes
+      rules:
+        # HTTP
+        - protocol: tcp
+          port_range_min: 80
+          port_range_max: 80
+        # HTTPS
+        - protocol: tcp
+          port_range_min: 443
+          port_range_max: 443
+
+  security_groups_bono:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "OS::stack_name" } }, template: __name_prefix__-bono } }
+      description: Security group for Bono nodes
+      rules:
+        # STUN/TURN
+        - protocol: udp
+          port_range_min: 3478
+          port_range_max: 3478
+        - protocol: tcp
+          port_range_min: 3478
+          port_range_max: 3478
+        # Internal SIP
+        - protocol: tcp
+          port_range_min: 5058
+          port_range_max: 5058
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: bono } # omit remote_group_id to reference yourself
+        - protocol: tcp
+          port_range_min: 5058
+          port_range_max: 5058
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: security_groups_sprout }
+        # External SIP
+        - protocol: udp
+          port_range_min: 5060
+          port_range_max: 5060
+        - protocol: tcp
+          port_range_min: 5060
+          port_range_max: 5060
+        # External SIP/WebSocket
+        - protocol: tcp
+          port_range_min: 5062
+          port_range_max: 5062
+        # RTP
+        - protocol: udp
+          port_range_min: 32768
+          port_range_max: 65535
+
+  security_groups_sprout:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "OS::stack_name" } }, template: __name_prefix__-sprout } }
+      description: Security group for Sprout nodes
+      rules:
+        # Internal SIP
+        - protocol: tcp
+          port_range_min: 5052
+          port_range_max: 5052
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+        - protocol: tcp
+          port_range_min: 5054
+          port_range_max: 5054
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+        # Chronos
+        - protocol: tcp
+          port_range_min: 7253
+          port_range_max: 7253
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+        # Chronos timer pops
+        - protocol: tcp
+          port_range_min: 9888
+          port_range_max: 9888
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+        # Memcached
+        - protocol: tcp
+          port_range_min: 11211
+          port_range_max: 11211
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+
+  security_groups_sprout2:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "OS::stack_name" } }, template: __name_prefix__-sprout2 } }
+      description: Additional security group for Sprout nodes (required to avoid circular dependency)
+      #            Specifically, Bono and Sprout depend on each other, as do Sprout and Homestead.  By dividing Sprout's
+      #            security group into one for other nodes to depend on (sprout) and a second to depend on other nodes
+      #            (sprout2), we break this cycle.
+      rules:
+        # Internal SIP
+        - protocol: tcp
+          port_range_min: 5052
+          port_range_max: 5052
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: security_groups_bono }
+        - protocol: tcp
+          port_range_min: 5054
+          port_range_max: 5054
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: security_groups_bono }
+        # Notifications from Homestead
+        - protocol: tcp
+          port_range_min: 9888
+          port_range_max: 9888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: security_groups_homestead }
+
+  security_groups_homer:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "OS::stack_name" } }, template: __name_prefix__-homer } }
+      description: Security group for Homer nodes
+      rules:
+        # Ut/HTTP
+        - protocol: tcp
+          port_range_min: 7888
+          port_range_max: 7888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: security_groups_ellis }
+        - protocol: tcp
+          port_range_min: 7888
+          port_range_max: 7888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: security_groups_sprout }
+        # Cassandra
+        - protocol: tcp
+          port_range_min: 7000
+          port_range_max: 7000
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: homer } # omit remote_group_id to reference yourself
+        - protocol: tcp
+          port_range_min: 9160
+          port_range_max: 9160
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: homer } # omit remote_group_id to reference yourself
+
+  security_groups_homestead:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "OS::stack_name" } }, template: __name_prefix__-homestead } }
+      description: Security group for Homestead nodes
+      rules:
+        # Cx-like HTTP API
+        - protocol: tcp
+          port_range_min: 8888
+          port_range_max: 8888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: security_groups_bono }
+        - protocol: tcp
+          port_range_min: 8888
+          port_range_max: 8888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: security_groups_sprout }
+        # REST-ful Provisioning API
+        - protocol: tcp
+          port_range_min: 8889
+          port_range_max: 8889
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: security_groups_ellis }
+        # Cassandra
+        - protocol: tcp
+          port_range_min: 7000
+          port_range_max: 7000
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: homestead } # omit remote_group_id to reference yourself
+        - protocol: tcp
+          port_range_min: 9160
+          port_range_max: 9160
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: homestead } # omit remote_group_id to reference yourself
+
+  security_groups_ralf:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "OS::stack_name" } }, template: __name_prefix__-ralf } }
+      description: Security group for Ralf nodes
+      rules:
+        # Rf-like/HTTP API
+        - protocol: tcp
+          port_range_min: 10888
+          port_range_max: 10888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: security_groups_bono }
+        - protocol: tcp
+          port_range_min: 10888
+          port_range_max: 10888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: security_groups_sprout }
+        # Chronos
+        - protocol: tcp
+          port_range_min: 7253
+          port_range_max: 7253
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: ralf } # omit remote_group_id to reference yourself
+        # Chronos timer pops
+        - protocol: tcp
+          port_range_min: 10888
+          port_range_max: 10888
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: ralf } # omit remote_group_id to reference yourself
+        # Memcached
+        - protocol: tcp
+          port_range_min: 11211
+          port_range_max: 11211
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: ralf } # omit remote_group_id to reference yourself
+
+  # From dns.yaml...
+  dns_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: network_private_net }
+      security_groups:
+        - { get_resource: security_groups_dns }
+
+  dns_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: dns_port }
+
+  dns_server:
+    type: OS::Nova::Server
+    properties:
+      name: { str_replace: { params: { __zone__: { get_param: zone } }, template: ns.__zone__ } }
       image: { get_param: image }
-      key_name: { get_param: key_name }
-      dns_security_group: { get_attr: [ security_groups, dns ] }
-      zone: { get_param: zone }
-      dnssec_key: { get_param: dnssec_key }
-
-  ellis:
-    type: ./ellis.yaml
-    properties:
-      public_net_id: { get_param: public_net_id }
-      private_net_id: { get_attr: [ network, private_net ] }
       flavor: { get_param: flavor }
-      image: { get_param: image }
       key_name: { get_param: key_name }
-      base_security_group: { get_attr: [ security_groups, base ] }
-      ellis_security_group: { get_attr: [ security_groups, ellis ] }
-      repo_url: { get_param: repo_url }
-      zone: { get_param: zone }
-      dn_range_start: { get_param: dn_range_start }
-      dn_range_length: { get_param: dn_range_length }
-      dns_ip: { get_attr: [ dns, private_ip ] }
-      dnssec_key: { get_param: dnssec_key }
+      networks:
+        - port: { get_resource: dns_port }
+      user_data:
+        str_replace:
+          params:
+            __zone__: { get_param: zone }
+            __dnssec_key__: { get_param: dnssec_key }
+            __public_ip__: { get_attr: [ dns_floating_ip, floating_ip_address ] }
+          template: |
+            #!/bin/bash
 
-  bono:
-    type: OS::Heat::ResourceGroup
-    properties:
-      count: { get_param: bono_cluster_size }
-      index_var: "__index__"
-      resource_def:
-        type: ./bono.yaml
-        properties:
-          public_net_id: { get_param: public_net_id }
-          private_net_id: { get_attr: [ network, private_net ] }
-          flavor: { get_param: flavor }
-          image: { get_param: image }
-          key_name: { get_param: key_name }
-          base_security_group: { get_attr: [ security_groups, base ] }
-          bono_security_group: { get_attr: [ security_groups, bono ] }
-          repo_url: { get_param: repo_url }
-          zone: { get_param: zone }
-          dns_ip: { get_attr: [ dns, private_ip ] }
-          dnssec_key: { get_param: dnssec_key }
-          etcd_ip: { get_attr: [ ellis, private_ip ] }
-          index: __index__
+            # Install BIND.
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install bind9 --yes
 
-  sprout:
-    type: OS::Heat::ResourceGroup
-    properties:
-      count: { get_param: sprout_cluster_size }
-      index_var: __index__
-      resource_def:
-        type: ./sprout.yaml
-        properties:
-          public_net_id: { get_param: public_net_id }
-          private_net_id: { get_attr: [ network, private_net ] }
-          flavor: { get_param: flavor }
-          image: { get_param: image }
-          key_name: { get_param: key_name }
-          base_security_group: { get_attr: [ security_groups, base ] }
-          sprout_security_group: { get_attr: [ security_groups, sprout ] }
-          sprout2_security_group: { get_attr: [ security_groups, sprout2 ] }
-          repo_url: { get_param: repo_url }
-          zone: { get_param: zone }
-          dns_ip: { get_attr: [ dns, private_ip ] }
-          dnssec_key: { get_param: dnssec_key }
-          etcd_ip: { get_attr: [ ellis, private_ip ] }
-          index: __index__
+            # Update BIND configuration with the specified zone and key.
+            cat >> /etc/bind/named.conf.local << EOF
+            key __zone__. {
+              algorithm "HMAC-MD5";
+              secret "__dnssec_key__";
+            };
 
-  homer:
-    type: OS::Heat::ResourceGroup
-    properties:
-      count: { get_param: homer_cluster_size }
-      index_var: __index__
-      resource_def:
-        type: ./homer.yaml
-        properties:
-          public_net_id: { get_param: public_net_id }
-          private_net_id: { get_attr: [ network, private_net ] }
-          flavor: { get_param: flavor }
-          image: { get_param: image }
-          key_name: { get_param: key_name }
-          base_security_group: { get_attr: [ security_groups, base ] }
-          homer_security_group: { get_attr: [ security_groups, homer ] }
-          repo_url: { get_param: repo_url }
-          zone: { get_param: zone }
-          dns_ip: { get_attr: [ dns, private_ip ] }
-          dnssec_key: { get_param: dnssec_key }
-          etcd_ip: { get_attr: [ ellis, private_ip ] }
-          index: __index__
+            zone "__zone__" IN {
+              type master;
+              file "/var/lib/bind/db.__zone__";
+              allow-update {
+                key __zone__.;
+              };
+            };
+            EOF
 
-  homestead:
-    type: OS::Heat::ResourceGroup
-    properties:
-      count: { get_param: homestead_cluster_size }
-      index_var: __index__
-      resource_def:
-        type: ./homestead.yaml
-        properties:
-          public_net_id: { get_param: public_net_id }
-          private_net_id: { get_attr: [ network, private_net ] }
-          flavor: { get_param: flavor }
-          image: { get_param: image }
-          key_name: { get_param: key_name }
-          base_security_group: { get_attr: [ security_groups, base ] }
-          homestead_security_group: { get_attr: [ security_groups, homestead ] }
-          repo_url: { get_param: repo_url }
-          zone: { get_param: zone }
-          dns_ip: { get_attr: [ dns, private_ip ] }
-          dnssec_key: { get_param: dnssec_key }
-          etcd_ip: { get_attr: [ ellis, private_ip ] }
-          index: __index__
+            # Create basic zone configuration.
+            cat > /var/lib/bind/db.__zone__ << EOF
+            \$ORIGIN __zone__.
+            \$TTL 1h
+            @ IN SOA ns admin\@__zone__. ( $(date +%Y%m%d%H) 1d 2h 1w 30s )
+            @ NS ns
+            ns A __public_ip__
+            EOF
+            chown root:bind /var/lib/bind/db.__zone__
 
-  ralf:
-    type: OS::Heat::ResourceGroup
+            # Now that BIND configuration is correct, kick it to reload.
+            service bind9 reload
+
+  # From ellis.yaml...
+  ellis_port:
+    type: OS::Neutron::Port
     properties:
-      count: { get_param: ralf_cluster_size }
-      index_var: __index__
-      resource_def:
-        type: ./ralf.yaml
-        properties:
-          public_net_id: { get_param: public_net_id }
-          private_net_id: { get_attr: [ network, private_net ] }
-          flavor: { get_param: flavor }
-          image: { get_param: image }
-          key_name: { get_param: key_name }
-          base_security_group: { get_attr: [ security_groups, base ] }
-          ralf_security_group: { get_attr: [ security_groups, ralf ] }
-          repo_url: { get_param: repo_url }
-          zone: { get_param: zone }
-          dns_ip: { get_attr: [ dns, private_ip ] }
-          dnssec_key: { get_param: dnssec_key }
-          etcd_ip: { get_attr: [ ellis, private_ip ] }
-          index: __index__
+      network_id: { get_resource: network_private_net }
+      security_groups:
+        - { get_resource: security_groups_base }
+        - { get_resource: security_groups_ellis }
+
+  ellis_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: ellis_port }
+
+  ellis_server:
+    type: OS::Nova::Server
+    properties:
+      name: { str_replace: { params: { __index__: 0, __zone__: { get_param: zone } }, template: ellis-__index__.__zone__ } }
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: ellis_port }
+      user_data:
+        str_replace:
+          params:
+            __repo_url__: { get_param: repo_url }
+            __zone__: { get_param: zone }
+            __public_ip__: { get_attr: [ ellis_floating_ip, floating_ip_address ] }
+            __dn_range_start__: { get_param: dn_range_start }
+            __dn_range_length__: { get_param: dn_range_length }
+            __dns_ip__: { get_attr: [ dns_server, first_address ] }
+            __dnssec_key__: { get_param: dnssec_key }
+            __etcd_ip__ : ""
+            __index__ : 0
+          template: |
+            #!/bin/bash
+
+            # Log all output to file.
+            exec > >(tee -a /var/log/clearwater-heat-ellis.log) 2>&1
+
+            # Configure the APT software source.
+            echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
+            curl -L http://repo.cw-ngv.com/repo_key | apt-key add -
+            apt-get update
+
+            # Configure /etc/clearwater/local_config.
+            mkdir -p /etc/clearwater
+            etcd_ip=__etcd_ip__
+            [ -n "$etcd_ip" ] || etcd_ip=$(hostname -I)
+            cat > /etc/clearwater/local_config << EOF
+            local_ip=$(hostname -I)
+            public_ip=__public_ip__
+            public_hostname=ellis-__index__.__zone__
+            etcd_cluster=$etcd_ip
+            EOF
+
+            # Now install the software.
+            # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
+            DEBIAN_FRONTEND=noninteractive apt-get install ellis --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-config-manager --yes --force-yes
+
+            # Wait until etcd is up and running before uploading/adding the shared_config
+            /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
+
+            # Configure and upload /etc/clearwater/shared_config.
+            cat > /etc/clearwater/shared_config << EOF
+            # Deployment definitions
+            home_domain=__zone__
+            sprout_hostname=sprout.__zone__
+            hs_hostname=hs.__zone__:8888
+            hs_provisioning_hostname=hs.__zone__:8889
+            ralf_hostname=ralf.__zone__:10888
+            xdms_hostname=homer.__zone__:7888
+            
+            # Email server configuration
+            smtp_smarthost=localhost
+            smtp_username=username
+            smtp_password=password
+            email_recovery_sender=clearwater@example.org
+            
+            # Keys
+            signup_key=secret
+            turn_workaround=secret
+            ellis_api_key=secret
+            ellis_cookie_key=secret
+            EOF
+            sudo /usr/share/clearwater/clearwater-config-manager/scripts/upload_shared_config
+            sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
+
+            # Allocate a allocate a pool of numbers to assign to users.
+            /usr/share/clearwater/ellis/env/bin/python /usr/share/clearwater/ellis/src/metaswitch/ellis/tools/create_numbers.py --start __dn_range_start__ --count __dn_range_length__
+
+            # Update DNS
+            retries=0
+            while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
+            server __dns_ip__
+            update add ellis-__index__.__zone__. 30 A __public_ip__
+            update add ellis.__zone__. 30 A __public_ip__
+            send
+            EOF
+            } && [ $retries -lt 10 ]
+            do
+              retries=$((retries + 1))
+              echo 'nsupdate failed - retrying (retry '$retries')...'
+              sleep 5
+            done
+
+            # Use the DNS server.
+            echo 'nameserver __dns_ip__' > /etc/dnsmasq.resolv.conf
+            echo 'RESOLV_CONF=/etc/dnsmasq.resolv.conf' >> /etc/default/dnsmasq
+            service dnsmasq force-reload
+
+  # From bono.yaml...
+  bono_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: network_private_net }
+      security_groups:
+        - { get_resource: security_groups_base }
+        - { get_resource: security_groups_bono }
+
+  bono_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: bono_port }
+
+  bono_server:
+    type: OS::Nova::Server
+    properties:
+      name: { str_replace: { params: { __index__: 0, __zone__: { get_param: zone } }, template: bono-__index__.__zone__ } }
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: bono_port }
+      user_data:
+        str_replace:
+          params:
+            __repo_url__: { get_param: repo_url }
+            __zone__: { get_param: zone }
+            __public_ip__: { get_attr: [ bono_floating_ip, floating_ip_address ] }
+            __dns_ip__: { get_attr: [ dns_server, first_address ] }
+            __dnssec_key__: { get_param: dnssec_key }
+            __etcd_ip__ : { get_attr: [ ellis_server, first_address ] }
+            __index__ : 0
+          template: |
+            #!/bin/bash
+
+            # Log all output to file.
+            exec > >(tee -a /var/log/clearwater-heat-bono.log) 2>&1
+
+            # Configure the APT software source.
+            echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
+            curl -L http://repo.cw-ngv.com/repo_key | apt-key add -
+            apt-get update
+
+            # Configure /etc/clearwater/local_config.
+            mkdir -p /etc/clearwater
+            etcd_ip=__etcd_ip__
+            [ -n "$etcd_ip" ] || etcd_ip=$(hostname -I)
+            cat > /etc/clearwater/local_config << EOF
+            local_ip=$(hostname -I)
+            public_ip=__public_ip__
+            public_hostname=bono-__index__.__zone__
+            etcd_cluster=$etcd_ip
+            EOF
+
+            # Now install the software.
+            # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
+            DEBIAN_FRONTEND=noninteractive apt-get install bono --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-config-manager --yes --force-yes
+
+            # Wait until etcd is up and running before applying the shared_config
+            /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
+            sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
+
+            # Update DNS
+            retries=0
+            while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
+            server __dns_ip__
+            update add bono-__index__.__zone__. 30 A __public_ip__
+            update add __zone__. 30 A __public_ip__
+            update add __zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.__zone__.
+            update add __zone__. 30 NAPTR 0 0 "s" "SIP+D2U" "" _sip._udp.__zone__.
+            update add _sip._tcp.__zone__. 30 SRV 0 0 5060 bono-__index__.__zone__.
+            update add _sip._udp.__zone__. 30 SRV 0 0 5060 bono-__index__.__zone__.
+            send
+            EOF
+            } && [ $retries -lt 10 ]
+            do
+              retries=$((retries + 1))
+              echo 'nsupdate failed - retrying (retry '$retries')...'
+              sleep 5
+            done
+
+            # Use the DNS server.
+            echo 'nameserver __dns_ip__' > /etc/dnsmasq.resolv.conf
+            echo 'RESOLV_CONF=/etc/dnsmasq.resolv.conf' >> /etc/default/dnsmasq
+            service dnsmasq force-reload
+
+  # From sprout.yaml...
+  sprout_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: network_private_net }
+      security_groups:
+        - { get_resource: security_groups_base }
+        - { get_resource: security_groups_sprout }
+        - { get_resource: security_groups_sprout2 }
+
+  sprout_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: sprout_port }
+
+  sprout_server:
+    type: OS::Nova::Server
+    properties:
+      name: { str_replace: { params: { __index__: 0, __zone__: { get_param: zone } }, template: sprout-__index__.__zone__ } }
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: sprout_port }
+      user_data:
+        str_replace:
+          params:
+            __repo_url__: { get_param: repo_url }
+            __zone__: { get_param: zone }
+            __public_ip__: { get_attr: [ sprout_floating_ip, floating_ip_address ] }
+            __dns_ip__: { get_attr: [ dns_server, first_address ] }
+            __dnssec_key__: { get_param: dnssec_key }
+            __etcd_ip__ : { get_attr: [ ellis_server, first_address ] }
+            __index__ : 0
+          template: |
+            #!/bin/bash
+
+            # Log all output to file.
+            exec > >(tee -a /var/log/clearwater-heat-sprout.log) 2>&1
+
+            # Configure the APT software source.
+            echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
+            curl -L http://repo.cw-ngv.com/repo_key | apt-key add -
+            apt-get update
+
+            # Configure /etc/clearwater/local_config.
+            mkdir -p /etc/clearwater
+            etcd_ip=__etcd_ip__
+            [ -n "$etcd_ip" ] || etcd_ip=$(hostname -I)
+            cat > /etc/clearwater/local_config << EOF
+            local_ip=$(hostname -I)
+            public_ip=__public_ip__
+            public_hostname=sprout-__index__.__zone__
+            etcd_cluster=$etcd_ip
+            EOF
+
+            # Create /etc/chronos/chronos.conf.
+            mkdir -p /etc/chronos
+            cat > /etc/chronos/chronos.conf << EOF
+            [http]
+            bind-address = $(hostname -I)
+            bind-port = 7253
+            threads = 50
+            
+            [logging]
+            folder = /var/log/chronos
+            level = 2
+            
+            [alarms]
+            enabled = true
+            
+            [exceptions]
+            max_ttl = 600
+            EOF
+
+            # Now install the software.
+            # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
+            DEBIAN_FRONTEND=noninteractive apt-get install sprout --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
+
+            # Wait until etcd is up and running before applying the shared_config
+            /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
+            sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
+
+            # Update DNS
+            retries=0
+            while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
+            server __dns_ip__
+            update add sprout-__index__.__zone__. 30 A $(hostname -I)
+            update add sprout.__zone__. 30 A $(hostname -I)
+            update add sprout.__zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.sprout.__zone__.
+            update add _sip._tcp.sprout.__zone__. 30 SRV 0 0 5054 sprout-__index__.__zone__.
+            update add icscf.sprout.__zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.icscf.sprout.__zone__.
+            update add _sip._tcp.icscf.sprout.__zone__. 30 SRV 0 0 5052 sprout-__index__.__zone__.
+            send
+            EOF
+            } && [ $retries -lt 10 ]
+            do
+              retries=$((retries + 1))
+              echo 'nsupdate failed - retrying (retry '$retries')...'
+              sleep 5
+            done
+
+            # Use the DNS server.
+            echo 'nameserver __dns_ip__' > /etc/dnsmasq.resolv.conf
+            echo 'RESOLV_CONF=/etc/dnsmasq.resolv.conf' >> /etc/default/dnsmasq
+            service dnsmasq force-reload
+
+  # From homer.yaml...
+  homer_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: network_private_net }
+      security_groups:
+        - { get_resource: security_groups_base }
+        - { get_resource: security_groups_homer }
+
+  homer_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: homer_port }
+
+  homer_server:
+    type: OS::Nova::Server
+    properties:
+      name: { str_replace: { params: { __index__: 0, __zone__: { get_param: zone } }, template: homer-__index__.__zone__ } }
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: homer_port }
+      user_data:
+        str_replace:
+          params:
+            __repo_url__: { get_param: repo_url }
+            __zone__: { get_param: zone }
+            __public_ip__: { get_attr: [ homer_floating_ip, floating_ip_address ] }
+            __dns_ip__: { get_attr: [ dns_server, first_address ] }
+            __dnssec_key__: { get_param: dnssec_key }
+            __etcd_ip__ : { get_attr: [ ellis_server, first_address ] }
+            __index__ : 0
+          template: |
+            #!/bin/bash
+
+            # Log all output to file.
+            exec > >(tee -a /var/log/clearwater-heat-homer.log) 2>&1
+
+            # Configure the APT software source.
+            echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
+            curl -L http://repo.cw-ngv.com/repo_key | apt-key add -
+            apt-get update
+
+            # Configure /etc/clearwater/local_config.
+            mkdir -p /etc/clearwater
+            etcd_ip=__etcd_ip__
+            [ -n "$etcd_ip" ] || etcd_ip=$(hostname -I)
+            cat > /etc/clearwater/local_config << EOF
+            local_ip=$(hostname -I)
+            public_ip=__public_ip__
+            public_hostname=homer-__index__.__zone__
+            etcd_cluster=$etcd_ip
+            EOF
+
+            # Now install the software.
+            # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-cassandra --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install homer --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
+
+            # Wait until etcd is up and running before applying the shared_config
+            /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
+            sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
+
+            # Update DNS
+            retries=0
+            while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
+            server __dns_ip__
+            update add homer-__index__.__zone__. 30 A __public_ip__
+            update add homer.__zone__. 30 A $(hostname -I)
+            send
+            EOF
+            } && [ $retries -lt 10 ]
+            do
+              retries=$((retries + 1))
+              echo 'nsupdate failed - retrying (retry '$retries')...'
+              sleep 5
+            done
+
+            # Use the DNS server.
+            echo 'nameserver __dns_ip__' > /etc/dnsmasq.resolv.conf
+            echo 'RESOLV_CONF=/etc/dnsmasq.resolv.conf' >> /etc/default/dnsmasq
+            service dnsmasq force-reload
+
+  # From homestead.yaml...
+  homestead_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: network_private_net }
+      security_groups:
+        - { get_resource: security_groups_base }
+        - { get_resource: security_groups_homestead }
+
+  homestead_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: homestead_port }
+
+  homestead_server:
+    type: OS::Nova::Server
+    properties:
+      name: { str_replace: { params: { __index__: 0, __zone__: { get_param: zone } }, template: homestead-__index__.__zone__ } }
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: homestead_port }
+      user_data:
+        str_replace:
+          params:
+            __repo_url__: { get_param: repo_url }
+            __zone__: { get_param: zone }
+            __public_ip__: { get_attr: [ homestead_floating_ip, floating_ip_address ] }
+            __dns_ip__: { get_attr: [ dns_server, first_address ] }
+            __dnssec_key__: { get_param: dnssec_key }
+            __etcd_ip__ : { get_attr: [ ellis_server, first_address ] }
+            __index__ : 0
+          template: |
+            #!/bin/bash
+
+            # Log all output to file.
+            exec > >(tee -a /var/log/clearwater-heat-homestead.log) 2>&1
+
+            # Configure the APT software source.
+            echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
+            curl -L http://repo.cw-ngv.com/repo_key | apt-key add -
+            apt-get update
+
+            # Configure /etc/clearwater/local_config.
+            mkdir -p /etc/clearwater
+            etcd_ip=__etcd_ip__
+            [ -n "$etcd_ip" ] || etcd_ip=$(hostname -I)
+            cat > /etc/clearwater/local_config << EOF
+            local_ip=$(hostname -I)
+            public_ip=__public_ip__
+            public_hostname=homestead-__index__.__zone__
+            etcd_cluster=$etcd_ip
+            EOF
+
+            # Now install the software.
+            # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-cassandra --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install homestead homestead-prov --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
+
+            # Wait until etcd is up and running before applying the shared_config
+            /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
+            sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
+
+            # Update DNS
+            retries=0
+            while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
+            server __dns_ip__
+            update add homestead-__index__.__zone__. 30 A __public_ip__
+            update add hs.__zone__. 30 A $(hostname -I)
+            send
+            EOF
+            } && [ $retries -lt 10 ]
+            do
+              retries=$((retries + 1))
+              echo 'nsupdate failed - retrying (retry '$retries')...'
+              sleep 5
+            done
+
+            # Use the DNS server.
+            echo 'nameserver __dns_ip__' > /etc/dnsmasq.resolv.conf
+            echo 'RESOLV_CONF=/etc/dnsmasq.resolv.conf' >> /etc/default/dnsmasq
+            service dnsmasq force-reload
+
+  # From ralf.yaml...
+  ralf_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: network_private_net }
+      security_groups:
+        - { get_resource: security_groups_base }
+        - { get_resource: security_groups_ralf }
+
+  ralf_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: ralf_port }
+
+  ralf_server:
+    type: OS::Nova::Server
+    properties:
+      name: { str_replace: { params: { __index__: 0, __zone__: { get_param: zone } }, template: ralf-__index__.__zone__ } }
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: ralf_port }
+      user_data:
+        str_replace:
+          params:
+            __repo_url__: { get_param: repo_url }
+            __zone__: { get_param: zone }
+            __public_ip__: { get_attr: [ ralf_floating_ip, floating_ip_address ] }
+            __dns_ip__: { get_attr: [ dns_server, first_address ] }
+            __dnssec_key__: { get_param: dnssec_key }
+            __etcd_ip__ : { get_attr: [ ellis_server, first_address ] }
+            __index__ : 0
+          template: |
+            #!/bin/bash
+
+            # Log all output to file.
+            exec > >(tee -a /var/log/clearwater-heat-ralf.log) 2>&1
+
+            # Configure the APT software source.
+            echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
+            curl -L http://repo.cw-ngv.com/repo_key | apt-key add -
+            apt-get update
+
+            # Configure /etc/clearwater/local_config.
+            mkdir -p /etc/clearwater
+            etcd_ip=__etcd_ip__
+            [ -n "$etcd_ip" ] || etcd_ip=$(hostname -I)
+            cat > /etc/clearwater/local_config << EOF
+            local_ip=$(hostname -I)
+            public_ip=__public_ip__
+            public_hostname=ralf-__index__.__zone__
+            etcd_cluster=$etcd_ip
+            EOF
+
+            # Create /etc/chronos/chronos.conf.
+            mkdir -p /etc/chronos
+            cat > /etc/chronos/chronos.conf << EOF
+            [http]
+            bind-address = $(hostname -I)
+            bind-port = 7253
+            threads = 50
+            
+            [logging]
+            folder = /var/log/chronos
+            level = 2
+            
+            [alarms]
+            enabled = true
+            
+            [exceptions]
+            max_ttl = 600
+            EOF
+
+            # Now install the software.
+            # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
+            DEBIAN_FRONTEND=noninteractive apt-get install ralf --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
+
+            # Wait until etcd is up and running before applying the shared_config
+            /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
+            sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
+
+            # Update DNS
+            retries=0
+            while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
+            server __dns_ip__
+            update add ralf-__index__.__zone__. 30 A __public_ip__
+            update add ralf.__zone__. 30 A $(hostname -I)
+            send
+            EOF
+            } && [ $retries -lt 10 ]
+            do
+              retries=$((retries + 1))
+              echo 'nsupdate failed - retrying (retry '$retries')...'
+              sleep 5
+            done
+
+            # Use the DNS server.
+            echo 'nameserver __dns_ip__' > /etc/dnsmasq.resolv.conf
+            echo 'RESOLV_CONF=/etc/dnsmasq.resolv.conf' >> /etc/default/dnsmasq
+            service dnsmasq force-reload
 
 outputs:
   zone:
@@ -292,4 +1102,4 @@ outputs:
     value: { get_param: zone }
   dns_ip:
     description: IP address of DNS
-    value: { get_attr: [ dns, public_ip ] }
+    value: { get_attr: [ dns_server, first_address ] }
