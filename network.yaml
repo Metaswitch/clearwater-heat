@@ -106,3 +106,9 @@ outputs:
   private_net:
     description: ID of private network
     value: { get_resource: private_net }
+  private_net_cidr:
+    description: Private network address (CIDR notation)
+    value: { get_param: private_net_cidr }
+  private_net_gateway:
+    description: Private network gateway address
+    value: { get_param: private_net_gateway }

@@ -42,11 +42,11 @@ parameters:
     default: clearwater
 
 resources:
-  base:
+  base_mgmt:
     type: OS::Neutron::SecurityGroup
     properties:
-      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-base } }
-      description: Base security group for all Clearwater nodes
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-base-mgmt } }
+      description: Base security group for all Clearwater nodes (management)
       rules:
         # All egress traffic
         - direction: egress
@@ -68,12 +68,12 @@ resources:
           port_range_min: 2380
           port_range_max: 2380
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: base } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: base_mgmt } # omit remote_group_id to reference yourself
         - protocol: tcp
           port_range_min: 4000
           port_range_max: 4000
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: base } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: base_mgmt } # omit remote_group_id to reference yourself
 
   dns:
     type: OS::Neutron::SecurityGroup
@@ -100,11 +100,11 @@ resources:
           port_range_min: 53
           port_range_max: 53
 
-  ellis:
+  ellis_mgmt:
     type: OS::Neutron::SecurityGroup
     properties:
-      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-ellis } }
-      description: Security group for Ellis nodes
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-ellis-mgmt } }
+      description: Security group for Ellis nodes (management)
       rules:
         # HTTP
         - protocol: tcp
@@ -115,11 +115,11 @@ resources:
           port_range_min: 443
           port_range_max: 443
 
-  bono:
+  bono_sig:
     type: OS::Neutron::SecurityGroup
     properties:
-      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-bono } }
-      description: Security group for Bono nodes
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-bono-sig } }
+      description: Security group for Bono nodes (signaling)
       rules:
         # STUN/TURN
         - protocol: udp
@@ -133,12 +133,12 @@ resources:
           port_range_min: 5058
           port_range_max: 5058
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: bono } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: bono_sig } # omit remote_group_id to reference yourself
         - protocol: tcp
           port_range_min: 5058
           port_range_max: 5058
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: sprout }
+          remote_group_id: { get_resource: sprout_sig }
         # External SIP
         - protocol: udp
           port_range_min: 5060
@@ -156,47 +156,47 @@ resources:
           port_range_max: 65535
 
 
-  sprout:
+  sprout_sig:
     type: OS::Neutron::SecurityGroup
     properties:
-      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-sprout } }
-      description: Security group for Sprout nodes
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-sprout-sig } }
+      description: Security group for Sprout nodes (signaling)
       rules:
         # Internal SIP
         - protocol: tcp
           port_range_min: 5052
           port_range_max: 5052
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: sprout_sig } # omit remote_group_id to reference yourself
         - protocol: tcp
           port_range_min: 5054
           port_range_max: 5054
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: sprout_sig } # omit remote_group_id to reference yourself
         # Chronos
         - protocol: tcp
           port_range_min: 7253
           port_range_max: 7253
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: sprout_sig } # omit remote_group_id to reference yourself
         # Chronos timer pops
         - protocol: tcp
           port_range_min: 9888
           port_range_max: 9888
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: sprout_sig } # omit remote_group_id to reference yourself
         # Memcached
         - protocol: tcp
           port_range_min: 11211
           port_range_max: 11211
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: sprout } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: sprout_sig } # omit remote_group_id to reference yourself
 
-  sprout2:
+  sprout_sig2:
     type: OS::Neutron::SecurityGroup
     properties:
-      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-sprout2 } }
-      description: Additional security group for Sprout nodes (required to avoid circular dependency)
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-sprout-sig2 } }
+      description: Additional security group for Sprout nodes (signaling) - required to avoid circular dependency
       #            Specifically, Bono and Sprout depend on each other, as do Sprout and Homestead.  By dividing Sprout's
       #            security group into one for other nodes to depend on (sprout) and a second to depend on other nodes
       #            (sprout2), we break this cycle.
@@ -206,144 +206,152 @@ resources:
           port_range_min: 5052
           port_range_max: 5052
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: bono }
+          remote_group_id: { get_resource: bono_sig }
         - protocol: tcp
           port_range_min: 5054
           port_range_max: 5054
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: bono }
+          remote_group_id: { get_resource: bono_sig }
         # Notifications from Homestead
         - protocol: tcp
           port_range_min: 9888
           port_range_max: 9888
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: homestead }
+          remote_group_id: { get_resource: homestead_sig }
 
-  homer:
+  homer_sig:
     type: OS::Neutron::SecurityGroup
     properties:
-      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-homer } }
-      description: Security group for Homer nodes
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-homer-sig } }
+      description: Security group for Homer nodes (signaling)
       rules:
         # Ut/HTTP
         - protocol: tcp
           port_range_min: 7888
           port_range_max: 7888
-          remote_mode: remote_group_id
-          remote_group_id: { get_resource: ellis }
         - protocol: tcp
           port_range_min: 7888
           port_range_max: 7888
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: sprout }
+          remote_group_id: { get_resource: sprout_sig }
         # Cassandra
         - protocol: tcp
           port_range_min: 7000
           port_range_max: 7000
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: homer } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: homer_sig } # omit remote_group_id to reference yourself
         - protocol: tcp
           port_range_min: 9160
           port_range_max: 9160
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: homer } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: homer_sig } # omit remote_group_id to reference yourself
 
-  homestead:
+  homestead_mgmt:
     type: OS::Neutron::SecurityGroup
     properties:
-      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-homestead } }
-      description: Security group for Homestead nodes
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-homestead-mgmt } }
+      description: Security group for Homestead nodes (management)
+      rules:
+        # REST-ful Provisioning API
+        - protocol: tcp
+          port_range_min: 8889
+          port_range_max: 8889
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: ellis_mgmt }
+
+  homestead_sig:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-homestead-sig } }
+      description: Security group for Homestead nodes (signaling)
       rules:
         # Cx-like HTTP API
         - protocol: tcp
           port_range_min: 8888
           port_range_max: 8888
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: bono }
+          remote_group_id: { get_resource: bono_sig }
         - protocol: tcp
           port_range_min: 8888
           port_range_max: 8888
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: sprout }
-        # REST-ful Provisioning API
-        - protocol: tcp
-          port_range_min: 8889
-          port_range_max: 8889
-          remote_mode: remote_group_id
-          remote_group_id: { get_resource: ellis }
+          remote_group_id: { get_resource: sprout_sig }
         # Cassandra
         - protocol: tcp
           port_range_min: 7000
           port_range_max: 7000
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: homestead } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: homestead_sig } # omit remote_group_id to reference yourself
         - protocol: tcp
           port_range_min: 9160
           port_range_max: 9160
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: homestead } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: homestead_sig } # omit remote_group_id to reference yourself
 
-  ralf:
+  ralf_sig:
     type: OS::Neutron::SecurityGroup
     properties:
-      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-ralf } }
-      description: Security group for Ralf nodes
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-ralf-sig } }
+      description: Security group for Ralf nodes (signaling)
       rules:
         # Rf-like/HTTP API
         - protocol: tcp
           port_range_min: 10888
           port_range_max: 10888
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: bono }
+          remote_group_id: { get_resource: bono_sig }
         - protocol: tcp
           port_range_min: 10888
           port_range_max: 10888
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: sprout }
+          remote_group_id: { get_resource: sprout_sig }
         # Chronos
         - protocol: tcp
           port_range_min: 7253
           port_range_max: 7253
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: ralf } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: ralf_sig } # omit remote_group_id to reference yourself
         # Chronos timer pops
         - protocol: tcp
           port_range_min: 10888
           port_range_max: 10888
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: ralf } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: ralf_sig } # omit remote_group_id to reference yourself
         # Memcached
         - protocol: tcp
           port_range_min: 11211
           port_range_max: 11211
           remote_mode: remote_group_id
-          #remote_group_id: { get_resource: ralf } # omit remote_group_id to reference yourself
+          #remote_group_id: { get_resource: ralf_sig } # omit remote_group_id to reference yourself
 
 outputs:
-  base:
-    description: Base security group for all Clearwater nodes
-    value: { get_resource: base } 
+  base_mgmt:
+    description: Base security group for all Clearwater nodes (management)
+    value: { get_resource: base_mgmt } 
   dns:
     description: Security group for DNS nodes
     value: { get_resource: dns }
-  ellis:
-    description: Security group for Ellis nodes
-    value: { get_resource: ellis }
-  bono:
-    description: Security group for Bono nodes
-    value: { get_resource: bono }
-  sprout:
-    description: Security group for Sprout nodes
-    value: { get_resource: sprout }
-  sprout2:
-    description: Additional security group for Sprout nodes
-    value: { get_resource: sprout2 }
-  homer:
-    description: Security group for Homer nodes
-    value: { get_resource: homer }
-  homestead:
-    description: Security group for Homestead nodes
-    value: { get_resource: homestead }
-  ralf:
-    description: Security group for Ralf nodes
-    value: { get_resource: ralf }
+  ellis_mgmt:
+    description: Security group for Ellis nodes (managment)
+    value: { get_resource: ellis_mgmt }
+  bono_sig:
+    description: Security group for Bono nodes (signaling)
+    value: { get_resource: bono_sig }
+  sprout_sig:
+    description: Security group for Sprout nodes (signaling)
+    value: { get_resource: sprout_sig }
+  sprout_sig2:
+    description: Additional security group for Sprout nodes (signaling)
+    value: { get_resource: sprout_sig2 }
+  homer_sig:
+    description: Security group for Homer nodes (signaling)
+    value: { get_resource: homer_sig }
+  homestead_mgmt:
+    description: Security group for Homestead nodes (management)
+    value: { get_resource: homestead_mgmt }
+  homestead_sig:
+    description: Security group for Homestead nodes (signaling)
+    value: { get_resource: homestead_sig }
+  ralf_sig:
+    description: Security group for Ralf nodes (signaling)
+    value: { get_resource: ralf_sig }
