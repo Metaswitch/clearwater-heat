@@ -46,6 +46,15 @@ parameters:
     type: string
     description: Name of private network
     default: clearwater-private
+  private_net_ip_version:
+    type: string
+    description: IP version (4 or 6)
+    constraints:
+      - allowed_values:
+        - "4"
+        - "6"
+        description: Must be 4 (IPv4) or 6 (IPv6)
+    default: "4"
   private_net_cidr:
     type: string
     description: Private network address (CIDR notation)
@@ -78,6 +87,7 @@ resources:
     properties:
       name: { get_param: private_net_name }
       network_id: { get_resource: private_net }
+      ip_version: { get_param: private_net_ip_version }
       cidr: { get_param: private_net_cidr }
       dns_nameservers: [ { get_param: dns_ip } ]
       gateway_ip: { get_param: private_net_gateway }

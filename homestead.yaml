@@ -181,9 +181,10 @@ resources:
             # Set up the signaling network namespace
             ip netns add signaling
             ip link set eth1 netns signaling
-            ip netns exec signaling ifconfig lo up
-            ip netns exec signaling ifconfig eth1 __private_sig_ip__/$(echo __private_sig_cidr__ | cut -d / -f 2) up
-            ip netns exec signaling route add default gateway __private_sig_gateway__ dev eth1
+            ip netns exec signaling ip link set dev lo up
+            ip netns exec signaling ip addr add __private_sig_ip__/$(echo __private_sig_cidr__ | cut -d / -f 2) dev eth1
+            ip netns exec signaling ip link set dev eth1 up
+            ip netns exec signaling ip route add default via __private_sig_gateway__
 
             # Configure the APT software source.
             echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list

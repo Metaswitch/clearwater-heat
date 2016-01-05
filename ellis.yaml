@@ -154,6 +154,7 @@ resources:
 
             # Log all output to file.
             exec > >(tee -a /var/log/clearwater-heat-ellis.log) 2>&1
+            set -x
 
             # Configure the APT software source.
             echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list

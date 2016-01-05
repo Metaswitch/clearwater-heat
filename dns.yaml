@@ -140,7 +140,8 @@ resources:
             set -x
 
             # Set up the signaling network interface
-            ifconfig eth1 __private_sig_ip__/$(echo __private_sig_cidr__ | cut -d / -f 2) up
+            ip addr add __private_sig_ip__/$(echo __private_sig_cidr__ | cut -d / -f 2) dev eth1
+            ip link set dev eth1 up
 
             # Install BIND.
             apt-get update
