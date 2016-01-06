@@ -89,6 +89,9 @@ parameters:
   base_mgmt_security_group:
     type: string
     description: ID of base security group for all Clearwater nodes (management)
+  homer_mgmt_security_group:
+    type: string
+    description: ID of security group for Homer nodes (maangement)
   homer_sig_security_group:
     type: string
     description: ID of security group for Homer nodes (signaling)
@@ -128,6 +131,7 @@ resources:
       network_id: { get_param: private_mgmt_net_id }
       security_groups:
         - { get_param: base_mgmt_security_group }
+        - { get_param: homer_mgmt_security_group }
 
   mgmt_floating_ip:
     type: OS::Neutron::FloatingIP

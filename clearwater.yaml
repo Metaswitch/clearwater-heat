@@ -298,6 +298,7 @@ resources:
           image: { get_param: image }
           key_name: { get_param: key_name }
           base_mgmt_security_group: { get_attr: [ security_groups, base_mgmt ] }
+          homer_mgmt_security_group: { get_attr: [ security_groups, homer_mgmt ] }
           homer_sig_security_group: { get_attr: [ security_groups, homer_sig ] }
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }

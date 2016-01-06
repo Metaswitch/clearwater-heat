@@ -219,6 +219,22 @@ resources:
           remote_mode: remote_group_id
           remote_group_id: { get_resource: homestead_sig }
 
+  homer_mgmt:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-homer-mgmt } }
+      description: Security group for Homer nodes (management)
+      rules:
+        # Ut/HTTP
+        - protocol: tcp
+          port_range_min: 7888
+          port_range_max: 7888
+        - protocol: tcp
+          port_range_min: 7888
+          port_range_max: 7888
+          remote_mode: remote_group_id
+          remote_group_id: { get_resource: sprout_sig }
+
   homer_sig:
     type: OS::Neutron::SecurityGroup
     properties:
@@ -343,6 +359,9 @@ outputs:
   sprout_sig2:
     description: Additional security group for Sprout nodes (signaling)
     value: { get_resource: sprout_sig2 }
+  homer_mgmt:
+    description: Security group for Homer nodes (management)
+    value: { get_resource: homer_mgmt }
   homer_sig:
     description: Security group for Homer nodes (signaling)
     value: { get_resource: homer_sig }
