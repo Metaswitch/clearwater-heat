@@ -163,13 +163,22 @@ resources:
             };
             EOF
 
+            # Function to give DNS record type and IP address for specified IP address
+            ip2rr() {
+              if echo $1 | grep -q -e '[^0-9.]' ; then
+                echo AAAA $1
+              else
+                echo A $1
+              fi
+            }
+
             # Create basic zone configuration.
             cat > /var/lib/bind/db.__zone__ << EOF
             \$ORIGIN __zone__.
             \$TTL 1h
             @ IN SOA ns admin\@__zone__. ( $(date +%Y%m%d%H) 1d 2h 1w 30s )
             @ NS ns
-            ns A __public_ip__
+            ns $(ip2rr __public_ip__)
             EOF
             chown root:bind /var/lib/bind/db.__zone__
 

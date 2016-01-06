@@ -217,13 +217,22 @@ resources:
             /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
             sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
 
+            # Function to give DNS record type and IP address for specified IP address
+            ip2rr() {
+              if echo $1 | grep -q -e '[^0-9.]' ; then
+                echo AAAA $1
+              else
+                echo A $1
+              fi
+            }
+
             # Update DNS
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
             server __dns_mgmt_ip__
-            update add bono-__index__.__zone__. 30 A __public_mgmt_ip__
-            update add __index__.bono.__zone__. 30 A __public_sig_ip__
-            update add __zone__. 30 A __public_sig_ip__
+            update add bono-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
+            update add __index__.bono.__zone__. 30 $(ip2rr __public_sig_ip__)
+            update add __zone__. 30 $(ip2rr __public_sig_ip__)
             update add __zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.__zone__.
             update add __zone__. 30 NAPTR 0 0 "s" "SIP+D2U" "" _sip._udp.__zone__.
             update add _sip._tcp.__zone__. 30 SRV 0 0 5060 __index__.bono.__zone__.
