@@ -178,13 +178,20 @@ resources:
             exec > >(tee -a /var/log/clearwater-heat-sprout.log) 2>&1
             set -x
 
-            # Set up the signaling network namespace
+            # Set up the signaling network namespace on each boot.
+            cat >/etc/rc.local <<EOF
+            #!/bin/bash
+            set -x
             ip netns add signaling
             ip link set eth1 netns signaling
             ip netns exec signaling ip link set dev lo up
             ip netns exec signaling ip addr add __private_sig_ip__/$(echo __private_sig_cidr__ | cut -d / -f 2) dev eth1
             ip netns exec signaling ip link set dev eth1 up
             ip netns exec signaling ip route add default via __private_sig_gateway__
+            EOF
+
+            # Also set up the signaling namespace now.
+            /etc/rc.local
 
             # Configure the APT software source.
             echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
