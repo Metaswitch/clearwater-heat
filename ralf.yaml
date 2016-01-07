@@ -174,13 +174,30 @@ resources:
             exec > >(tee -a /var/log/clearwater-heat-ralf.log) 2>&1
             set -x
 
-            # Set up the signaling network namespace
+            # Set up the signaling network namespace on each boot by creating an init file and
+            # linking to it from runlevel 2 and 3
+            cat >/etc/init.d/signaling_namespace <<EOF
+            #!/bin/bash
+            # Create the signaling namespace and configure its interfaces.
+            set -e
+
+            # Exit if the namespace is already set up.
+            ip netns list | grep -q signaling && exit 0
+
             ip netns add signaling
             ip link set eth1 netns signaling
             ip netns exec signaling ip link set dev lo up
             ip netns exec signaling ip addr add __private_sig_ip__/$(echo __private_sig_cidr__ | cut -d / -f 2) dev eth1
             ip netns exec signaling ip link set dev eth1 up
             ip netns exec signaling ip route add default via __private_sig_gateway__
+            EOF
+
+            chmod a+x /etc/init.d/signaling_namespace
+            ln -s /etc/init.d/signaling_namespace /etc/rc2.d/S01signaling_namespace
+            ln -s /etc/init.d/signaling_namespace /etc/rc3.d/S01signaling_namespace
+
+            # Also set up the signaling namespace now.
+            /etc/init.d/signaling_namespace
 
             # Configure the APT software source.
             echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
@@ -208,14 +225,14 @@ resources:
             bind-address = __private_sig_ip__
             bind-port = 7253
             threads = 50
-            
+
             [logging]
             folder = /var/log/chronos
             level = 2
-            
+
             [alarms]
             enabled = true
-            
+
             [exceptions]
             max_ttl = 600
             EOF
