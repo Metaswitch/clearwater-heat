@@ -184,6 +184,8 @@ resources:
             # Exit if the namespace is already set up.
             ip netns list | grep -q signaling && exit 0
 
+            # eth1 is the signaling interface (and eth0 is the management interface).
+            # We need to set eth1 up manually - only eth0 is automatically configured via DHCP.
             ip netns add signaling
             ip link set eth1 netns signaling
             ip netns exec signaling ip link set dev lo up
