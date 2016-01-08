@@ -36,18 +36,34 @@ description: >
   DNS server exposing dynamic DNS using DNSSEC
 
 parameters:
-  public_net_id:
+  public_mgmt_net_id:
     type: string
-    description: ID of public network
+    description: ID of public management network
     constraints:
       - custom_constraint: neutron.network
         description: Must be a valid network ID
-  private_net_id:
+  private_mgmt_net_id:
     type: string
-    description: ID of private network
+    description: ID of private management network
     constraints:
       - custom_constraint: neutron.network
         description: Must be a valid network ID
+  public_sig_net_id:
+    type: string
+    description: ID of public signaling network
+    constraints:
+      - custom_constraint: neutron.network
+        description: Must be a valid network ID
+  private_sig_net_id:
+    type: string
+    description: ID of private signaling network
+    constraints:
+      - custom_constraint: neutron.network
+        description: Must be a valid network ID
+  private_sig_net_cidr:
+    type: string
+    description: Private signaling network address (CIDR notation)
+    default: 192.168.1.0/24
   flavor:
     type: string
     description: Flavor to use
@@ -78,18 +94,25 @@ parameters:
     description: DNSSEC private key (Base64-encoded)
 
 resources:
-  port:
+  mgmt_port:
     type: OS::Neutron::Port
     properties:
-      network_id: { get_param: private_net_id }
+      network_id: { get_param: private_mgmt_net_id }
       security_groups:
         - { get_param: dns_security_group }
 
-  floating_ip:
+  mgmt_floating_ip:
     type: OS::Neutron::FloatingIP
     properties:
-      floating_network_id: { get_param: public_net_id }
-      port_id: { get_resource: port }
+      floating_network_id: { get_param: public_mgmt_net_id }
+      port_id: { get_resource: mgmt_port }
+
+  sig_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: private_sig_net_id }
+      security_groups:
+        - { get_param: dns_security_group }
 
   server:
     type: OS::Nova::Server
@@ -99,15 +122,26 @@ resources:
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
       networks:
-        - port: { get_resource: port }
+        - port: { get_resource: mgmt_port }
+        - port: { get_resource: sig_port }
       user_data:
         str_replace:
           params:
             __zone__: { get_param: zone }
             __dnssec_key__: { get_param: dnssec_key }
-            __public_ip__: { get_attr: [ floating_ip, floating_ip_address ] }
+            __public_ip__: { get_attr: [ mgmt_floating_ip, floating_ip_address ] }
+            __private_sig_ip__: { get_attr: [ sig_port, fixed_ips, 0, ip_address ] }
+            __private_sig_cidr__: { get_param: private_sig_net_cidr }
           template: |
             #!/bin/bash
+
+            # Log all output to file.
+            exec > >(tee -a /var/log/clearwater-heat-dns.log) 2>&1
+            set -x
+
+            # Set up the signaling network interface
+            ip addr add __private_sig_ip__/$(echo __private_sig_cidr__ | cut -d / -f 2) dev eth1
+            ip link set dev eth1 up
 
             # Install BIND.
             apt-get update
@@ -129,13 +163,22 @@ resources:
             };
             EOF
 
+            # Function to give DNS record type and IP address for specified IP address
+            ip2rr() {
+              if echo $1 | grep -q -e '[^0-9.]' ; then
+                echo AAAA $1
+              else
+                echo A $1
+              fi
+            }
+
             # Create basic zone configuration.
             cat > /var/lib/bind/db.__zone__ << EOF
             \$ORIGIN __zone__.
             \$TTL 1h
             @ IN SOA ns admin\@__zone__. ( $(date +%Y%m%d%H) 1d 2h 1w 30s )
             @ NS ns
-            ns A __public_ip__
+            ns $(ip2rr __public_ip__)
             EOF
             chown root:bind /var/lib/bind/db.__zone__
 
@@ -143,12 +186,15 @@ resources:
             service bind9 reload
 
 outputs:
-  public_ip:
-    description: IP address in public network
-    value: { get_attr: [ floating_ip, floating_ip_address ] }
-  private_ip:
-    description: IP address in private network
-    value: { get_attr: [ server, first_address ] }
+  public_mgmt_ip:
+    description: IP address in public management network
+    value: { get_attr: [ mgmt_floating_ip, floating_ip_address ] }
+  private_mgmt_ip:
+    description: IP address in private signaling network
+    value: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
+  private_sig_ip:
+    description: IP address in private signaling network
+    value: { get_attr: [ sig_port, fixed_ips, 0, ip_address ] }
   zone:
     description: DNS zone
     value: { get_param: zone }

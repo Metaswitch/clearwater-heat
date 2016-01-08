@@ -36,18 +36,38 @@ description: >
   Clearwater Bono node
 
 parameters:
-  public_net_id:
+  public_mgmt_net_id:
     type: string
-    description: ID of public network
+    description: ID of public management network
     constraints:
       - custom_constraint: neutron.network
         description: Must be a valid network ID
-  private_net_id:
+  private_mgmt_net_id:
     type: string
-    description: ID of private network
+    description: ID of private management network
     constraints:
       - custom_constraint: neutron.network
         description: Must be a valid network ID
+  public_sig_net_id:
+    type: string
+    description: ID of public signaling network
+    constraints:
+      - custom_constraint: neutron.network
+        description: Must be a valid network ID
+  private_sig_net_id:
+    type: string
+    description: ID of private signaling network
+    constraints:
+      - custom_constraint: neutron.network
+        description: Must be a valid network ID
+  private_sig_net_cidr:
+    type: string
+    description: Private signaling network address (CIDR notation)
+    default: 192.168.1.0/24
+  private_sig_net_gateway:
+    type: string
+    description: Private signaling network gateway address
+    default: 192.168.1.254
   flavor:
     type: string
     description: Flavor to use
@@ -66,12 +86,12 @@ parameters:
     constraints:
       - custom_constraint: nova.keypair
         description: Must be a valid keypair name
-  base_security_group:
+  base_mgmt_security_group:
     type: string
-    description: ID of base security group for all Clearwater nodes
-  bono_security_group:
+    description: ID of base security group for all Clearwater nodes (managment)
+  bono_sig_security_group:
     type: string
-    description: ID of security group for Bono nodes
+    description: ID of security group for Bono nodes (signaling)
   repo_url:
     type: string
     description: URL for Clearwater repository
@@ -80,9 +100,12 @@ parameters:
     type: string
     description: DNS zone
     default: example.com
-  dns_ip:
+  dns_mgmt_ip:
     type: string
-    description: IP address for DNS server
+    description: IP address for DNS server on management network
+  dns_sig_ip:
+    type: string
+    description: IP address for DNS server on signaling network
   dnssec_key:
     type: string
     description: DNSSEC private key (Base64-encoded)
@@ -99,19 +122,31 @@ parameters:
     default: 0
 
 resources:
-  port:
+  mgmt_port:
     type: OS::Neutron::Port
     properties:
-      network_id: { get_param: private_net_id }
+      network_id: { get_param: private_mgmt_net_id }
       security_groups:
-        - { get_param: base_security_group }
-        - { get_param: bono_security_group }
+        - { get_param: base_mgmt_security_group }
 
-  floating_ip:
+  mgmt_floating_ip:
     type: OS::Neutron::FloatingIP
     properties:
-      floating_network_id: { get_param: public_net_id }
-      port_id: { get_resource: port }
+      floating_network_id: { get_param: public_mgmt_net_id }
+      port_id: { get_resource: mgmt_port }
+
+  sig_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: private_sig_net_id }
+      security_groups:
+        - { get_param: bono_sig_security_group }
+
+  sig_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_sig_net_id }
+      port_id: { get_resource: sig_port }
 
   server:
     type: OS::Nova::Server
@@ -121,14 +156,21 @@ resources:
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
       networks:
-        - port: { get_resource: port }
+        - port: { get_resource: mgmt_port }
+        - port: { get_resource: sig_port }
       user_data:
         str_replace:
           params:
             __repo_url__: { get_param: repo_url }
             __zone__: { get_param: zone }
-            __public_ip__: { get_attr: [ floating_ip, floating_ip_address ] }
-            __dns_ip__: { get_param: dns_ip }
+            __public_mgmt_ip__: { get_attr: [ mgmt_floating_ip, floating_ip_address ] }
+            __private_mgmt_ip__: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
+            __public_sig_ip__: { get_attr: [ sig_floating_ip, floating_ip_address ] }
+            __private_sig_ip__: { get_attr: [ sig_port, fixed_ips, 0, ip_address ] }
+            __private_sig_cidr__: { get_param: private_sig_net_cidr }
+            __private_sig_gateway__: { get_param: private_sig_net_gateway }
+            __dns_mgmt_ip__: { get_param: dns_mgmt_ip }
+            __dns_sig_ip__: { get_param: dns_sig_ip }
             __dnssec_key__: { get_param: dnssec_key }
             __etcd_ip__ : { get_param: etcd_ip }
             __index__ : { get_param: index }
@@ -137,6 +179,34 @@ resources:
 
             # Log all output to file.
             exec > >(tee -a /var/log/clearwater-heat-bono.log) 2>&1
+            set -x
+
+            # Set up the signaling network namespace on each boot by creating an init file and
+            # linking to it from runlevel 2 and 3
+            cat >/etc/init.d/signaling_namespace <<EOF
+            #!/bin/bash
+            # Create the signaling namespace and configure its interfaces.
+            set -e
+
+            # Exit if the namespace is already set up.
+            ip netns list | grep -q signaling && exit 0
+
+            # eth1 is the signaling interface (and eth0 is the management interface).
+            # We need to set eth1 up manually - only eth0 is automatically configured via DHCP.
+            ip netns add signaling
+            ip link set eth1 netns signaling
+            ip netns exec signaling ip link set dev lo up
+            ip netns exec signaling ip addr add __private_sig_ip__/$(echo __private_sig_cidr__ | cut -d / -f 2) dev eth1
+            ip netns exec signaling ip link set dev eth1 up
+            ip netns exec signaling ip route add default via __private_sig_gateway__
+            EOF
+
+            chmod a+x /etc/init.d/signaling_namespace
+            ln -s /etc/init.d/signaling_namespace /etc/rc2.d/S01signaling_namespace
+            ln -s /etc/init.d/signaling_namespace /etc/rc3.d/S01signaling_namespace
+
+            # Also set up the signaling namespace now.
+            /etc/init.d/signaling_namespace
 
             # Configure the APT software source.
             echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
@@ -146,11 +216,14 @@ resources:
             # Configure /etc/clearwater/local_config.
             mkdir -p /etc/clearwater
             etcd_ip=__etcd_ip__
-            [ -n "$etcd_ip" ] || etcd_ip=$(hostname -I)
+            [ -n "$etcd_ip" ] || etcd_ip=__private_mgmt_ip__
             cat > /etc/clearwater/local_config << EOF
-            local_ip=$(hostname -I)
-            public_ip=__public_ip__
-            public_hostname=bono-__index__.__zone__
+            signaling_namespace=signaling
+            signaling_dns_server=__dns_sig_ip__
+            management_local_ip=__private_mgmt_ip__
+            local_ip=__private_sig_ip__
+            public_ip=__public_sig_ip__
+            public_hostname=__index__.bono.__zone__
             etcd_cluster=$etcd_ip
             EOF
 
@@ -163,16 +236,26 @@ resources:
             /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
             sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
 
+            # Function to give DNS record type and IP address for specified IP address
+            ip2rr() {
+              if echo $1 | grep -q -e '[^0-9.]' ; then
+                echo AAAA $1
+              else
+                echo A $1
+              fi
+            }
+
             # Update DNS
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
-            server __dns_ip__
-            update add bono-__index__.__zone__. 30 A __public_ip__
-            update add __zone__. 30 A __public_ip__
+            server __dns_mgmt_ip__
+            update add bono-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
+            update add __index__.bono.__zone__. 30 $(ip2rr __public_sig_ip__)
+            update add __zone__. 30 $(ip2rr __public_sig_ip__)
             update add __zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.__zone__.
             update add __zone__. 30 NAPTR 0 0 "s" "SIP+D2U" "" _sip._udp.__zone__.
-            update add _sip._tcp.__zone__. 30 SRV 0 0 5060 bono-__index__.__zone__.
-            update add _sip._udp.__zone__. 30 SRV 0 0 5060 bono-__index__.__zone__.
+            update add _sip._tcp.__zone__. 30 SRV 0 0 5060 __index__.bono.__zone__.
+            update add _sip._udp.__zone__. 30 SRV 0 0 5060 __index__.bono.__zone__.
             send
             EOF
             } && [ $retries -lt 10 ]
@@ -183,14 +266,22 @@ resources:
             done
 
             # Use the DNS server.
-            echo 'nameserver __dns_ip__' > /etc/dnsmasq.resolv.conf
+            echo 'nameserver __dns_mgmt_ip__' > /etc/dnsmasq.resolv.conf
             echo 'RESOLV_CONF=/etc/dnsmasq.resolv.conf' >> /etc/default/dnsmasq
+            mkdir -p /etc/netns/signaling
+            echo 'nameserver __dns_sig_ip__' > /etc/netns/signaling/resolv.conf
             service dnsmasq force-reload
 
 outputs:
-  public_ip:
-    description: IP address in public network
-    value: { get_attr: [ floating_ip, floating_ip_address ] }
-  private_ip:
-    description: IP address in private network
-    value: { get_attr: [ server, first_address ] }
+  public_mgmt_ip:
+    description: IP address in public management network
+    value: { get_attr: [ mgmt_floating_ip, floating_ip_address ] }
+  private_mgmt_ip:
+    description: IP address in private management network
+    value: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
+  public_sig_ip:
+    description: IP address in public signaling network
+    value: { get_attr: [ sig_floating_ip, floating_ip_address ] }
+  private_sig_ip:
+    description: IP address in private signaling network
+    value: { get_attr: [ sig_port, fixed_ips, 0, ip_address ] }

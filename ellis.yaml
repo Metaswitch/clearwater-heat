@@ -36,15 +36,15 @@ description: >
   Clearwater Ellis node
 
 parameters:
-  public_net_id:
+  public_mgmt_net_id:
     type: string
-    description: ID of public network
+    description: ID of public management network
     constraints:
       - custom_constraint: neutron.network
         description: Must be a valid network ID
-  private_net_id:
+  private_mgmt_net_id:
     type: string
-    description: ID of private network
+    description: ID of private management network
     constraints:
       - custom_constraint: neutron.network
         description: Must be a valid network ID
@@ -66,12 +66,12 @@ parameters:
     constraints:
       - custom_constraint: nova.keypair
         description: Must be a valid keypair name
-  base_security_group:
+  base_mgmt_security_group:
     type: string
-    description: ID of base security group for all Clearwater nodes
-  ellis_security_group:
+    description: ID of base security group for all Clearwater nodes (management)
+  ellis_mgmt_security_group:
     type: string
-    description: ID of security group for Ellis nodes
+    description: ID of security group for Ellis nodes (management)
   repo_url:
     type: string
     description: URL for Clearwater repository
@@ -94,7 +94,7 @@ parameters:
     constraints:
       - allowed_pattern: "[0-9]+"
         description: Must be numeric
-  dns_ip:
+  dns_mgmt_ip:
     type: string
     description: IP address for DNS server
   dnssec_key:
@@ -113,19 +113,19 @@ parameters:
     default: 0
 
 resources:
-  port:
+  mgmt_port:
     type: OS::Neutron::Port
     properties:
-      network_id: { get_param: private_net_id }
+      network_id: { get_param: private_mgmt_net_id }
       security_groups:
-        - { get_param: base_security_group }
-        - { get_param: ellis_security_group }
+        - { get_param: base_mgmt_security_group }
+        - { get_param: ellis_mgmt_security_group }
 
-  floating_ip:
+  mgmt_floating_ip:
     type: OS::Neutron::FloatingIP
     properties:
-      floating_network_id: { get_param: public_net_id }
-      port_id: { get_resource: port }
+      floating_network_id: { get_param: public_mgmt_net_id }
+      port_id: { get_resource: mgmt_port }
 
   server:
     type: OS::Nova::Server
@@ -135,16 +135,17 @@ resources:
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
       networks:
-        - port: { get_resource: port }
+        - port: { get_resource: mgmt_port }
       user_data:
         str_replace:
           params:
             __repo_url__: { get_param: repo_url }
             __zone__: { get_param: zone }
-            __public_ip__: { get_attr: [ floating_ip, floating_ip_address ] }
+            __public_mgmt_ip__: { get_attr: [ mgmt_floating_ip, floating_ip_address ] }
+            __private_mgmt_ip__: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
             __dn_range_start__: { get_param: dn_range_start }
             __dn_range_length__: { get_param: dn_range_length }
-            __dns_ip__: { get_param: dns_ip }
+            __dns_mgmt_ip__: { get_param: dns_mgmt_ip }
             __dnssec_key__: { get_param: dnssec_key }
             __etcd_ip__ : { get_param: etcd_ip }
             __index__ : { get_param: index }
@@ -153,6 +154,7 @@ resources:
 
             # Log all output to file.
             exec > >(tee -a /var/log/clearwater-heat-ellis.log) 2>&1
+            set -x
 
             # Configure the APT software source.
             echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
@@ -162,10 +164,10 @@ resources:
             # Configure /etc/clearwater/local_config.
             mkdir -p /etc/clearwater
             etcd_ip=__etcd_ip__
-            [ -n "$etcd_ip" ] || etcd_ip=$(hostname -I)
+            [ -n "$etcd_ip" ] || etcd_ip=__private_mgmt_ip__
             cat > /etc/clearwater/local_config << EOF
-            local_ip=$(hostname -I)
-            public_ip=__public_ip__
+            local_ip=__private_mgmt_ip__
+            public_ip=__public_mgmt_ip__
             public_hostname=ellis-__index__.__zone__
             etcd_cluster=$etcd_ip
             EOF
@@ -184,7 +186,7 @@ resources:
             home_domain=__zone__
             sprout_hostname=sprout.__zone__
             hs_hostname=hs.__zone__:8888
-            hs_provisioning_hostname=hs.__zone__:8889
+            hs_provisioning_hostname=hs-prov.__zone__:8889
             ralf_hostname=ralf.__zone__:10888
             xdms_hostname=homer.__zone__:7888
             
@@ -203,15 +205,30 @@ resources:
             sudo /usr/share/clearwater/clearwater-config-manager/scripts/upload_shared_config
             sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
 
+            # Tweak /etc/clearwater/shared_config to use homer's management hostname instead of signaling.
+            # This works around https://github.com/Metaswitch/ellis/issues/153.
+            sed -e 's/^xdms_hostname=.*$/xdms_hostname=homer-0.__zone__:7888/g' -i /etc/clearwater/shared_config
+            service clearwater-infrastructure restart
+            service ellis stop
+
             # Allocate a allocate a pool of numbers to assign to users.
             /usr/share/clearwater/ellis/env/bin/python /usr/share/clearwater/ellis/src/metaswitch/ellis/tools/create_numbers.py --start __dn_range_start__ --count __dn_range_length__
+
+            # Function to give DNS record type and IP address for specified IP address
+            ip2rr() {
+              if echo $1 | grep -q -e '[^0-9.]' ; then
+                echo AAAA $1
+              else
+                echo A $1
+              fi
+            }
 
             # Update DNS
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
-            server __dns_ip__
-            update add ellis-__index__.__zone__. 30 A __public_ip__
-            update add ellis.__zone__. 30 A __public_ip__
+            server __dns_mgmt_ip__
+            update add ellis-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
+            update add ellis.__zone__. 30 $(ip2rr __public_mgmt_ip__)
             send
             EOF
             } && [ $retries -lt 10 ]
@@ -222,14 +239,14 @@ resources:
             done
 
             # Use the DNS server.
-            echo 'nameserver __dns_ip__' > /etc/dnsmasq.resolv.conf
+            echo 'nameserver __dns_mgmt_ip__' > /etc/dnsmasq.resolv.conf
             echo 'RESOLV_CONF=/etc/dnsmasq.resolv.conf' >> /etc/default/dnsmasq
             service dnsmasq force-reload
 
 outputs:
-  public_ip:
-    description: IP address in public network
-    value: { get_attr: [ floating_ip, floating_ip_address ] }
-  private_ip:
-    description: IP address in private network
-    value: { get_attr: [ server, first_address ] }
+  public_mgmt_ip:
+    description: IP address in public management network
+    value: { get_attr: [ mgmt_floating_ip, floating_ip_address ] }
+  private_mgmt_ip:
+    description: IP address in private management network
+    value: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
