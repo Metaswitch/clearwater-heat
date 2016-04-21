@@ -271,6 +271,8 @@ resources:
             update add _sip._tcp.sprout.__zone__. 30 SRV 0 0 5054 __index__.sprout.__zone__.
             update add icscf.sprout.__zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.icscf.sprout.__zone__.
             update add _sip._tcp.icscf.sprout.__zone__. 30 SRV 0 0 5052 __index__.sprout.__zone__.
+            update add scscf.sprout.__zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.scscf.sprout.__zone__.
+            update add _sip._tcp.scscf.sprout.__zone__. 30 SRV 0 0 5054 __index__.sprout.__zone__.
             send
             EOF
             } && [ $retries -lt 10 ]
