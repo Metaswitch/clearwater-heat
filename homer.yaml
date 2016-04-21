@@ -232,9 +232,8 @@ resources:
             EOF
 
             # Now install the software.
-            # "-o DPkg::options::=--force-confnew" works around https://github.com/Metaswitch/clearwater-infrastructure/issues/186.
-            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-cassandra --yes --force-yes -o DPkg::options::=--force-confnew
-            DEBIAN_FRONTEND=noninteractive apt-get install homer --yes --force-yes -o DPkg::options::=--force-confnew
+            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-cassandra --yes --force-yes
+            DEBIAN_FRONTEND=noninteractive apt-get install homer --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
             # Wait until etcd is up and running before applying the shared_config
