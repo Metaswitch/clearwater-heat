@@ -116,7 +116,7 @@ resources:
   mgmt_port:
     type: OS::Neutron::Port
     properties:
-      network_id: { get_param: private_mgmt_net_id }
+      network_id: { str_replace: { params: { x: { get_param: private_mgmt_net_id } }, template: x } }
       security_groups:
         - { get_param: base_mgmt_security_group }
         - { get_param: ellis_mgmt_security_group }
