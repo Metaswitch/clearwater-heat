@@ -125,7 +125,8 @@ resources:
   mgmt_port:
     type: OS::Neutron::Port
     properties:
-      network_id: { get_param: private_mgmt_net_id }
+      # Specify the network ID by string to work around OpenStack issues - see https://github.com/Metaswitch/clearwater-heat/issues/18.
+      network_id: { str_replace: { params: { x: { get_param: private_mgmt_net_id } }, template: x } }
       security_groups:
         - { get_param: base_mgmt_security_group }
 
@@ -138,7 +139,8 @@ resources:
   sig_port:
     type: OS::Neutron::Port
     properties:
-      network_id: { get_param: private_sig_net_id }
+      # Specify the network ID by string to work around OpenStack issues - see https://github.com/Metaswitch/clearwater-heat/issues/18.
+      network_id: { str_replace: { params: { x: { get_param: private_sig_net_id } }, template: x } }
       security_groups:
         - { get_param: bono_sig_security_group }
 
