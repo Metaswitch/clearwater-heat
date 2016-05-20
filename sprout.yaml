@@ -249,10 +249,6 @@ resources:
             DEBIAN_FRONTEND=noninteractive apt-get install sprout --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
-            # Wait until etcd is up and running before applying the shared_config
-            /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
-            sudo /usr/share/clearwater/clearwater-config-manager/scripts/apply_shared_config --sync
-
             # Function to give DNS record type and IP address for specified IP address
             ip2rr() {
               if echo $1 | grep -q -e '[^0-9.]' ; then
@@ -269,6 +265,8 @@ resources:
             update add sprout-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
             update add __index__.sprout.__zone__. 30 $(ip2rr __private_sig_ip__)
             update add sprout.__zone__. 30 $(ip2rr __private_sig_ip__)
+            update add scscf.sprout.__zone__. 30 $(ip2rr __private_sig_ip__)
+            update add icscf.sprout.__zone__. 30 $(ip2rr __private_sig_ip__)
             update add sprout.__zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.sprout.__zone__.
             update add _sip._tcp.sprout.__zone__. 30 SRV 0 0 5054 __index__.sprout.__zone__.
             update add icscf.sprout.__zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.icscf.sprout.__zone__.
