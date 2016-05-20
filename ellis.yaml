@@ -190,7 +190,6 @@ resources:
             ralf_hostname=ralf.__zone__:10888
             xdms_hostname=homer.__zone__:7888
             
-            upstream_hostname=icscf.sprout.__zone__
             upstream_port=0
 
             # Email server configuration
