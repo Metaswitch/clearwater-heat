@@ -137,6 +137,7 @@ resources:
       key_name: { get_param: key_name }
       networks:
         - port: { get_resource: mgmt_port }
+      user_data_format: RAW
       user_data:
         str_replace:
           params:
