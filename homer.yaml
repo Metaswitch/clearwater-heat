@@ -164,6 +164,7 @@ resources:
       networks:
         - port: { get_resource: mgmt_port }
         - port: { get_resource: sig_port }
+      user_data_format: RAW
       user_data:
         str_replace:
           params:
