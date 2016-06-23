@@ -235,7 +235,6 @@ resources:
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-cassandra --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install homer --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
