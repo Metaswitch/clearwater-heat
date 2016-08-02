@@ -175,7 +175,7 @@ resources:
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install ellis --yes --force-yes
+            DEBIAN_FRONTEND=noninteractive apt-get install ellis-node --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
             # Wait until etcd is up and running before uploading the shared_config
@@ -190,7 +190,7 @@ resources:
             hs_provisioning_hostname=hs-prov.__zone__:8889
             ralf_hostname=ralf.__zone__:10888
             xdms_hostname=homer.__zone__:7888
-            
+
             upstream_port=0
 
             # Email server configuration
@@ -198,7 +198,7 @@ resources:
             smtp_username=username
             smtp_password=password
             email_recovery_sender=clearwater@example.org
-            
+
             # Keys
             signup_key=secret
             turn_workaround=secret
