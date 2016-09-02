@@ -88,15 +88,29 @@ resources:
           ethertype: IPv6
         # ICMP
         - protocol: icmp
+        - protocol: icmp
+          ethertype: IPv6
         # SSH
         - protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+        - protocol: tcp
+          ethertype: IPv6
           port_range_min: 22
           port_range_max: 22
         # DNS
         - protocol: udp
           port_range_min: 53
           port_range_max: 53
+        - protocol: udp
+          ethertype: IPv6
+          port_range_min: 53
+          port_range_max: 53
         - protocol: tcp
+          port_range_min: 53
+          port_range_max: 53
+        - protocol: tcp
+          ethertype: IPv6
           port_range_min: 53
           port_range_max: 53
 
@@ -123,38 +137,45 @@ resources:
       rules:
         # STUN/TURN
         - protocol: udp
+          ethertype: IPv6
           port_range_min: 3478
           port_range_max: 3478
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 3478
           port_range_max: 3478
         # Internal SIP
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 5058
           port_range_max: 5058
           remote_mode: remote_group_id
           #remote_group_id: { get_resource: bono_sig } # omit remote_group_id to reference yourself
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 5058
           port_range_max: 5058
           remote_mode: remote_group_id
           remote_group_id: { get_resource: sprout_sig }
         # External SIP
         - protocol: udp
+          ethertype: IPv6
           port_range_min: 5060
           port_range_max: 5060
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 5060
           port_range_max: 5060
         # External SIP/WebSocket
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 5062
           port_range_max: 5062
         # RTP
         - protocol: udp
+          ethertype: IPv6
           port_range_min: 32768
           port_range_max: 65535
-
 
   sprout_sig:
     type: OS::Neutron::SecurityGroup
@@ -164,29 +185,34 @@ resources:
       rules:
         # Internal SIP
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 5052
           port_range_max: 5052
           remote_mode: remote_group_id
           #remote_group_id: { get_resource: sprout_sig } # omit remote_group_id to reference yourself
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 5054
           port_range_max: 5054
           remote_mode: remote_group_id
           #remote_group_id: { get_resource: sprout_sig } # omit remote_group_id to reference yourself
         # Chronos
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 7253
           port_range_max: 7253
           remote_mode: remote_group_id
           #remote_group_id: { get_resource: sprout_sig } # omit remote_group_id to reference yourself
         # Chronos timer pops
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 9888
           port_range_max: 9888
           remote_mode: remote_group_id
           #remote_group_id: { get_resource: sprout_sig } # omit remote_group_id to reference yourself
         # Memcached
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 11211
           port_range_max: 11211
           remote_mode: remote_group_id
@@ -203,17 +229,20 @@ resources:
       rules:
         # Internal SIP
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 5052
           port_range_max: 5052
           remote_mode: remote_group_id
           remote_group_id: { get_resource: bono_sig }
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 5054
           port_range_max: 5054
           remote_mode: remote_group_id
           remote_group_id: { get_resource: bono_sig }
         # Notifications from Homestead
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 9888
           port_range_max: 9888
           remote_mode: remote_group_id
@@ -243,20 +272,24 @@ resources:
       rules:
         # Ut/HTTP
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 7888
           port_range_max: 7888
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 7888
           port_range_max: 7888
           remote_mode: remote_group_id
           remote_group_id: { get_resource: sprout_sig }
         # Cassandra
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 7000
           port_range_max: 7000
           remote_mode: remote_group_id
           #remote_group_id: { get_resource: homer_sig } # omit remote_group_id to reference yourself
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 9160
           port_range_max: 9160
           remote_mode: remote_group_id
@@ -283,22 +316,26 @@ resources:
       rules:
         # Cx-like HTTP API
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 8888
           port_range_max: 8888
           remote_mode: remote_group_id
           remote_group_id: { get_resource: bono_sig }
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 8888
           port_range_max: 8888
           remote_mode: remote_group_id
           remote_group_id: { get_resource: sprout_sig }
         # Cassandra
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 7000
           port_range_max: 7000
           remote_mode: remote_group_id
           #remote_group_id: { get_resource: homestead_sig } # omit remote_group_id to reference yourself
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 9160
           port_range_max: 9160
           remote_mode: remote_group_id
@@ -312,29 +349,34 @@ resources:
       rules:
         # Rf-like/HTTP API
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 10888
           port_range_max: 10888
           remote_mode: remote_group_id
           remote_group_id: { get_resource: bono_sig }
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 10888
           port_range_max: 10888
           remote_mode: remote_group_id
           remote_group_id: { get_resource: sprout_sig }
         # Chronos
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 7253
           port_range_max: 7253
           remote_mode: remote_group_id
           #remote_group_id: { get_resource: ralf_sig } # omit remote_group_id to reference yourself
         # Chronos timer pops
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 10888
           port_range_max: 10888
           remote_mode: remote_group_id
           #remote_group_id: { get_resource: ralf_sig } # omit remote_group_id to reference yourself
         # Memcached
         - protocol: tcp
+          ethertype: IPv6
           port_range_min: 11211
           port_range_max: 11211
           remote_mode: remote_group_id
@@ -343,7 +385,7 @@ resources:
 outputs:
   base_mgmt:
     description: Base security group for all Clearwater nodes (management)
-    value: { get_resource: base_mgmt } 
+    value: { get_resource: base_mgmt }
   dns:
     description: Security group for DNS nodes
     value: { get_resource: dns }
