@@ -55,6 +55,8 @@ resources:
           ethertype: IPv6
         # ICMP
         - protocol: icmp
+        - protocol: icmp
+          ethertype: IPv6
         # SSH
         - protocol: tcp
           port_range_min: 22

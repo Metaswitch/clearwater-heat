@@ -77,26 +77,6 @@ parameters:
         - "6"
         description: Must be 4 (IPv4) or 6 (IPv6)
     default: "4"
-  private_sig_net_cidr:
-    type: string
-    description: Private signaling network address (CIDR notation)
-    default: 192.168.1.0/24
-  private_sig_net_gateway:
-    type: string
-    description: Private signaling network gateway address
-    default: 192.168.1.254
-  private_sig_net_pool_start:
-    type: string
-    description: Start of private signaling network IP address pool
-    default: 192.168.1.1
-  private_sig_net_pool_end:
-    type: string
-    description: End of private signaling network IP address pool
-    default: 192.168.1.253
-  external_sig_dns_ip:
-    type: string
-    description: IP address of external DNS server on signaling network
-    default: 8.8.8.8
   flavor:
     type: string
     description: Flavor to use
@@ -176,18 +156,6 @@ resources:
       private_net_pool_end: { get_param: private_mgmt_net_pool_end }
       dns_ip: { get_param: external_mgmt_dns_ip }
 
-  sig_network:
-    type: ./network.yaml
-    properties:
-      public_net_id: { get_param: public_sig_net_id }
-      private_net_name: { str_replace: { params: { __stack__: { get_param: "OS::stack_name" } }, template: __stack__-private-signaling } }
-      private_net_ip_version: { get_param: private_sig_net_ip_version }
-      private_net_cidr: { get_param: private_sig_net_cidr }
-      private_net_gateway: { get_param: private_sig_net_gateway }
-      private_net_pool_start: { get_param: private_sig_net_pool_start }
-      private_net_pool_end: { get_param: private_sig_net_pool_end }
-      dns_ip: { get_param: external_sig_dns_ip }
-
   security_groups:
     type: ./security-groups.yaml
     properties:
@@ -199,8 +167,6 @@ resources:
       public_mgmt_net_id: { get_param: public_mgmt_net_id }
       private_mgmt_net_id: { get_attr: [ mgmt_network, private_net ] }
       public_sig_net_id: { get_param: public_sig_net_id }
-      private_sig_net_id: { get_attr: [ sig_network, private_net ] }
-      private_sig_net_cidr: { get_attr: [ sig_network, private_net_cidr ] }
       flavor: { get_param: flavor }
       image: { get_param: image }
       key_name: { get_param: key_name }
@@ -236,9 +202,6 @@ resources:
           public_mgmt_net_id: { get_param: public_mgmt_net_id }
           private_mgmt_net_id: { get_attr: [ mgmt_network, private_net ] }
           public_sig_net_id: { get_param: public_sig_net_id }
-          private_sig_net_id: { get_attr: [ sig_network, private_net ] }
-          private_sig_net_cidr: { get_attr: [ sig_network, private_net_cidr ] }
-          private_sig_net_gateway: { get_attr: [ sig_network, private_net_gateway ] }
           flavor: { get_param: flavor }
           image: { get_param: image }
           key_name: { get_param: key_name }
@@ -247,7 +210,7 @@ resources:
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_mgmt_ip: { get_attr: [ dns, private_mgmt_ip ] }
-          dns_sig_ip: { get_attr: [ dns, private_sig_ip ] }
+          dns_sig_ip: { get_attr: [ dns, public_sig_ip ] }
           dnssec_key: { get_param: dnssec_key }
           etcd_ip: { get_attr: [ ellis, private_mgmt_ip ] }
           index: __index__
@@ -263,9 +226,6 @@ resources:
           public_mgmt_net_id: { get_param: public_mgmt_net_id }
           private_mgmt_net_id: { get_attr: [ mgmt_network, private_net ] }
           public_sig_net_id: { get_param: public_sig_net_id }
-          private_sig_net_id: { get_attr: [ sig_network, private_net ] }
-          private_sig_net_cidr: { get_attr: [ sig_network, private_net_cidr ] }
-          private_sig_net_gateway: { get_attr: [ sig_network, private_net_gateway ] }
           flavor: { get_param: flavor }
           image: { get_param: image }
           key_name: { get_param: key_name }
@@ -275,7 +235,7 @@ resources:
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_mgmt_ip: { get_attr: [ dns, private_mgmt_ip ] }
-          dns_sig_ip: { get_attr: [ dns, private_sig_ip ] }
+          dns_sig_ip: { get_attr: [ dns, public_sig_ip ] }
           dnssec_key: { get_param: dnssec_key }
           etcd_ip: { get_attr: [ ellis, private_mgmt_ip ] }
           index: __index__
@@ -291,9 +251,6 @@ resources:
           public_mgmt_net_id: { get_param: public_mgmt_net_id }
           private_mgmt_net_id: { get_attr: [ mgmt_network, private_net ] }
           public_sig_net_id: { get_param: public_sig_net_id }
-          private_sig_net_id: { get_attr: [ sig_network, private_net ] }
-          private_sig_net_cidr: { get_attr: [ sig_network, private_net_cidr ] }
-          private_sig_net_gateway: { get_attr: [ sig_network, private_net_gateway ] }
           flavor: { get_param: flavor }
           image: { get_param: image }
           key_name: { get_param: key_name }
@@ -303,7 +260,7 @@ resources:
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_mgmt_ip: { get_attr: [ dns, private_mgmt_ip ] }
-          dns_sig_ip: { get_attr: [ dns, private_sig_ip ] }
+          dns_sig_ip: { get_attr: [ dns, public_sig_ip ] }
           dnssec_key: { get_param: dnssec_key }
           etcd_ip: { get_attr: [ ellis, private_mgmt_ip ] }
           index: __index__
@@ -319,9 +276,6 @@ resources:
           public_mgmt_net_id: { get_param: public_mgmt_net_id }
           private_mgmt_net_id: { get_attr: [ mgmt_network, private_net ] }
           public_sig_net_id: { get_param: public_sig_net_id }
-          private_sig_net_id: { get_attr: [ sig_network, private_net ] }
-          private_sig_net_cidr: { get_attr: [ sig_network, private_net_cidr ] }
-          private_sig_net_gateway: { get_attr: [ sig_network, private_net_gateway ] }
           flavor: { get_param: flavor }
           image: { get_param: image }
           key_name: { get_param: key_name }
@@ -331,7 +285,7 @@ resources:
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_mgmt_ip: { get_attr: [ dns, private_mgmt_ip ] }
-          dns_sig_ip: { get_attr: [ dns, private_sig_ip ] }
+          dns_sig_ip: { get_attr: [ dns, public_sig_ip ] }
           dnssec_key: { get_param: dnssec_key }
           etcd_ip: { get_attr: [ ellis, private_mgmt_ip ] }
           index: __index__
@@ -347,9 +301,6 @@ resources:
           public_mgmt_net_id: { get_param: public_mgmt_net_id }
           private_mgmt_net_id: { get_attr: [ mgmt_network, private_net ] }
           public_sig_net_id: { get_param: public_sig_net_id }
-          private_sig_net_id: { get_attr: [ sig_network, private_net ] }
-          private_sig_net_cidr: { get_attr: [ sig_network, private_net_cidr ] }
-          private_sig_net_gateway: { get_attr: [ sig_network, private_net_gateway ] }
           flavor: { get_param: flavor }
           image: { get_param: image }
           key_name: { get_param: key_name }
@@ -358,7 +309,7 @@ resources:
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_mgmt_ip: { get_attr: [ dns, private_mgmt_ip ] }
-          dns_sig_ip: { get_attr: [ dns, private_sig_ip ] }
+          dns_sig_ip: { get_attr: [ dns, public_sig_ip ] }
           dnssec_key: { get_param: dnssec_key }
           etcd_ip: { get_attr: [ ellis, private_mgmt_ip ] }
           index: __index__

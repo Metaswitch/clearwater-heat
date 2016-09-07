@@ -54,20 +54,6 @@ parameters:
     constraints:
       - custom_constraint: neutron.network
         description: Must be a valid network ID
-  private_sig_net_id:
-    type: string
-    description: ID of private signaling network
-    constraints:
-      - custom_constraint: neutron.network
-        description: Must be a valid network ID
-  private_sig_net_cidr:
-    type: string
-    description: Private signaling network address (CIDR notation)
-    default: 192.168.1.0/24
-  private_sig_net_gateway:
-    type: string
-    description: Private signaling network gateway address
-    default: 192.168.1.254
   flavor:
     type: string
     description: Flavor to use
@@ -143,16 +129,9 @@ resources:
   sig_port:
     type: OS::Neutron::Port
     properties:
-      # Specify the network ID by string to work around OpenStack issues - see https://github.com/Metaswitch/clearwater-heat/issues/18.
-      network_id: { str_replace: { params: { x: { get_param: private_sig_net_id } }, template: x } }
+      network_id: { get_param: public_sig_net_id }
       security_groups:
         - { get_param: homer_sig_security_group }
-
-  sig_floating_ip:
-    type: OS::Neutron::FloatingIP
-    properties:
-      floating_network_id: { get_param: public_sig_net_id }
-      port_id: { get_resource: sig_port }
 
   server:
     type: OS::Nova::Server
@@ -172,10 +151,7 @@ resources:
             __zone__: { get_param: zone }
             __public_mgmt_ip__: { get_attr: [ mgmt_floating_ip, floating_ip_address ] }
             __private_mgmt_ip__: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
-            __public_sig_ip__: { get_attr: [ sig_floating_ip, floating_ip_address ] }
-            __private_sig_ip__: { get_attr: [ sig_port, fixed_ips, 0, ip_address ] }
-            __private_sig_cidr__: { get_param: private_sig_net_cidr }
-            __private_sig_gateway__: { get_param: private_sig_net_gateway }
+            __public_sig_ip__: { get_attr: [ sig_port, fixed_ips, 0, ip_address ] }
             __dns_mgmt_ip__: { get_param: dns_mgmt_ip }
             __dns_sig_ip__: { get_param: dns_sig_ip }
             __dnssec_key__: { get_param: dnssec_key }
@@ -203,9 +179,9 @@ resources:
             ip netns add signaling
             ip link set eth1 netns signaling
             ip netns exec signaling ip link set dev lo up
-            ip netns exec signaling ip addr add __private_sig_ip__/$(echo __private_sig_cidr__ | cut -d / -f 2) dev eth1
+            ip netns exec signaling ip addr add __public_sig_ip__/64 dev eth1
             ip netns exec signaling ip link set dev eth1 up
-            ip netns exec signaling ip route add default via __private_sig_gateway__
+            ip netns exec signaling ip route add default via fd5f:5d21:845:1402::2
             EOF
 
             chmod a+x /etc/init.d/signaling_namespace
@@ -228,7 +204,7 @@ resources:
             signaling_namespace=signaling
             signaling_dns_server=__dns_sig_ip__
             management_local_ip=__private_mgmt_ip__
-            local_ip=__private_sig_ip__
+            local_ip=__public_sig_ip__
             public_ip=__public_sig_ip__
             public_hostname=homer-__index__.__zone__
             etcd_cluster=$etcd_ip
@@ -279,7 +255,4 @@ outputs:
     value: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
   public_sig_ip:
     description: IP address in public signaling network
-    value: { get_attr: [ sig_floating_ip, floating_ip_address ] }
-  private_sig_ip:
-    description: IP address in private signaling network
     value: { get_attr: [ sig_port, fixed_ips, 0, ip_address ] }
