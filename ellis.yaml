@@ -210,7 +210,11 @@ resources:
             EOF
             sudo /usr/share/clearwater/clearwater-config-manager/scripts/upload_shared_config
 
-            # Allocate a allocate a pool of numbers to assign to users.
+            # Allocate a pool of numbers to assign to users.  Before we do this,
+            # restart clearwater-infrastructure to make sure that
+            # local_settings.py runs to pick up the configuration changes.
+            service clearwater-infrastructure restart
+            service ellis stop
             /usr/share/clearwater/ellis/env/bin/python /usr/share/clearwater/ellis/src/metaswitch/ellis/tools/create_numbers.py --start __dn_range_start__ --count __dn_range_length__
 
             # Function to give DNS record type and IP address for specified IP address
