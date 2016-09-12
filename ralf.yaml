@@ -210,7 +210,6 @@ resources:
             mkdir -p /etc/chronos
             cat > /etc/chronos/chronos.conf << EOF
             [http]
-            bind-address = __public_sig_ip__
             bind-port = 7253
             threads = 50
 
