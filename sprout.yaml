@@ -247,7 +247,7 @@ resources:
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install sprout --yes --force-yes
+            DEBIAN_FRONTEND=noninteractive apt-get install sprout-node --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
             # Function to give DNS record type and IP address for specified IP address

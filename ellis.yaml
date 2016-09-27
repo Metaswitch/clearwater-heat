@@ -178,7 +178,7 @@ resources:
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install ellis --yes --force-yes
+            DEBIAN_FRONTEND=noninteractive apt-get install ellis-node --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
             # Wait until etcd is up and running before uploading the shared_config
