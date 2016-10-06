@@ -155,18 +155,15 @@ resources:
             ip route add default via fd5f:5d21:845:1402::2
 
             # Configure the APT software source.
-            add-apt-repository ppa:rkd-u/fhoss #s
-            apt-get update #s
+            add-apt-repository ppa:rkd-u/fhoss 
+            apt-get update 
 
             # Prepare to install the OpenIMS HSS noninteractively
             # We want different signaling and management IPs. FHoSS installer
             # doesn't deal with this and we'll need to give Tomcat the
             # management IP afterwards as it doesn't like listening on ::.
-            #s all
             debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/ip_to_use     string ::"
             debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/hss_config    select yes"
-            # The default user should be enough for our purposes
-            # sudo debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/adding_user   string"
             debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/where_is_java string /usr/bin/java"
             debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/dns_ip_to_use string"
             debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/domain_to_use string __zone__"
@@ -202,14 +199,13 @@ resources:
             done
 
             # Use the DNS server.
-            apt-get -y --force-yes install dnsmasq #s
+            apt-get -y --force-yes install dnsmasq 
             echo 'nameserver __dns_mgmt_ip__' > /etc/dnsmasq.resolv.conf
             echo 'RESOLV_CONF=/etc/dnsmasq.resolv.conf' >> /etc/default/dnsmasq
             service dnsmasq force-reload
 
             # Set up some subscribers for testing
             apt-get -y install python-mysqldb
-
             cat > /usr/share/java/fhoss-0.2/provision_subs.py << EOF
             import MySQLdb as m
 
