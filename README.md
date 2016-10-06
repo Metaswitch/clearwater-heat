@@ -12,3 +12,6 @@ To use them, you must
 -   create the stack by running `heat stack-create clearwater -f clearwater.yaml -P "public_mgmt_net_id=...;public_sig_net_id=...;dnssec_key=..."`.
 
 For further options, see the definition of the `parameters` block in `clearwater.yaml`.
+
+## FHoSS (OpenIMSCore HSS)
+By supplying the parameter `use_fhoss=1` in the `-P` block, a FHoSS instance will be spun up and Clearwater will be configured to use it instead of Ellis. The HSS is automatically populated with three identities for testing purposes: `lovelace`, `dave` and `imhotep`, all with the password `test`.

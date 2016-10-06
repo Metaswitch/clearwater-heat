@@ -143,6 +143,10 @@ parameters:
     type: number
     description: Number of Ralf nodes in Ralf cluster
     default: 1
+  use_fhoss:
+    type: number
+    description: Use an OpenIMS FHoSS instance to test against a standalone HSS
+    default: 0
 
 resources:
   mgmt_network:
@@ -190,6 +194,7 @@ resources:
       dn_range_length: { get_param: dn_range_length }
       dns_mgmt_ip: { get_attr: [ dns, private_mgmt_ip ] }
       dnssec_key: { get_param: dnssec_key }
+      use_fhoss: { get_param: use_fhoss }
 
   bono:
     type: OS::Heat::ResourceGroup
@@ -264,6 +269,28 @@ resources:
           dnssec_key: { get_param: dnssec_key }
           etcd_ip: { get_attr: [ ellis, private_mgmt_ip ] }
           index: __index__
+  
+  fhoss:
+    type: OS::Heat::ResourceGroup
+    properties:
+      count: { get_param: use_fhoss }
+      index_var: __index__
+      resource_def:
+        type: ./fhoss.yaml
+        properties:
+          public_mgmt_net_id: { get_param: public_mgmt_net_id }
+          private_mgmt_net_id: { get_attr: [ mgmt_network, private_net ] }
+          public_sig_net_id: { get_param: public_sig_net_id }
+          flavor: { get_param: flavor }
+          image: { get_param: image }
+          key_name: { get_param: key_name }
+          fhoss_sig_security_group: { get_attr: [ security_groups, fhoss_sig ] }
+          base_mgmt_security_group: { get_attr: [ security_groups, base_mgmt ] }
+          fhoss_mgmt_security_group: { get_attr: [ security_groups, fhoss_mgmt ] }
+          zone: { get_param: zone }
+          dns_mgmt_ip: { get_attr: [ dns, private_mgmt_ip ] }
+          dns_sig_ip: { get_attr: [ dns, public_sig_ip ] }
+          dnssec_key: { get_param: dnssec_key }
 
   homestead:
     type: OS::Heat::ResourceGroup

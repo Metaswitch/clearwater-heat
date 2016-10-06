@@ -33,7 +33,7 @@
 heat_template_version: 2013-05-23
 
 description: >
-  Clearwater Ellis node
+  FHoSS node for Clearwater
 
 parameters:
   public_mgmt_net_id:
@@ -45,6 +45,12 @@ parameters:
   private_mgmt_net_id:
     type: string
     description: ID of private management network
+    constraints:
+      - custom_constraint: neutron.network
+        description: Must be a valid network ID
+  public_sig_net_id:
+    type: string
+    description: ID of public signaling network
     constraints:
       - custom_constraint: neutron.network
         description: Must be a valid network ID
@@ -69,54 +75,37 @@ parameters:
   base_mgmt_security_group:
     type: string
     description: ID of base security group for all Clearwater nodes (management)
-  ellis_mgmt_security_group:
+  fhoss_mgmt_security_group:
     type: string
-    description: ID of security group for Ellis nodes (management)
-  repo_url:
+    description: Security group for FHoSS (management)
+  fhoss_sig_security_group:
     type: string
-    description: URL for Clearwater repository
-    default: http://repo.cw-ngv.com/stable
+    description: Security group for FHoSS (signaling)
   zone:
     type: string
     description: DNS zone
     default: example.com
-  dn_range_start:
-    type: string
-    description: First directory number in pool
-    default: "6505550000"
-    constraints:
-      - allowed_pattern: "[0-9]+"
-        description: Must be numeric
-  dn_range_length:
-    type: string
-    description: Number of directory numbers to add to pool
-    default: "1000"
-    constraints:
-      - allowed_pattern: "[0-9]+"
-        description: Must be numeric
   dns_mgmt_ip:
     type: string
     description: IP address for DNS server
+  dns_sig_ip:
+    type: string
+    description: IP address for DNS server on signaling network
   dnssec_key:
     type: string
     description: DNSSEC private key (Base64-encoded)
     constraints:
       - allowed_pattern: "[0-9A-Za-z+/=]+"
         description: Must be Base64-encoded
-  etcd_ip:
-    type: string
-    description: IP address of an existing member of the etcd cluster
-    default: ""
-  index:
-    type: number
-    description: Index of this Ellis node in the Ellis cluster
-    default: 0
-  use_fhoss:
-    type: number
-    description: Use an OpenIMS FHoSS instance to test against a standalone HSS
-    default: 0
 
 resources:
+  sig_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: public_sig_net_id }
+      security_groups:
+        - { get_param: fhoss_sig_security_group }
+
   mgmt_port:
     type: OS::Neutron::Port
     properties:
@@ -124,7 +113,7 @@ resources:
       network_id: { str_replace: { params: { x: { get_param: private_mgmt_net_id } }, template: x } }
       security_groups:
         - { get_param: base_mgmt_security_group }
-        - { get_param: ellis_mgmt_security_group }
+        - { get_param: fhoss_mgmt_security_group }
 
   mgmt_floating_ip:
     type: OS::Neutron::FloatingIP
@@ -135,104 +124,56 @@ resources:
   server:
     type: OS::Nova::Server
     properties:
-      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: ellis-__index__.__zone__ } }
+      name: { str_replace: { params: {__zone__: { get_param: zone } }, template: fhoss.__zone__ } }
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
       networks:
         - port: { get_resource: mgmt_port }
+        - port: { get_resource: sig_port }
       user_data_format: RAW
       user_data:
         str_replace:
           params:
-            __repo_url__: { get_param: repo_url }
             __zone__: { get_param: zone }
             __public_mgmt_ip__: { get_attr: [ mgmt_floating_ip, floating_ip_address ] }
             __private_mgmt_ip__: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
-            __dn_range_start__: { get_param: dn_range_start }
-            __dn_range_length__: { get_param: dn_range_length }
+            __public_sig_ip__: { get_attr: [ sig_port, fixed_ips, 0, ip_address ] }
             __dns_mgmt_ip__: { get_param: dns_mgmt_ip }
+            __dns_sig_ip__: { get_param: dns_sig_ip }
             __dnssec_key__: { get_param: dnssec_key }
-            __etcd_ip__ : { get_param: etcd_ip }
-            __index__ : { get_param: index }
-            __use_fhoss__: { get_param: use_fhoss }
           template: |
             #!/bin/bash
 
             # Log all output to file.
-            exec > >(tee -a /var/log/clearwater-heat-ellis.log) 2>&1
+            exec > >(tee -a /var/log/clearwater-heat-fhoss.log) 2>&1
             set -x
 
+            # Set up eth1 for signaling
+            ip addr add __public_sig_ip__/64 dev eth1
+            ip link set dev eth1 up
+            ip route add default via fd5f:5d21:845:1402::2
+
             # Configure the APT software source.
-            echo 'deb __repo_url__ binary/' > /etc/apt/sources.list.d/clearwater.list
-            curl -L http://repo.cw-ngv.com/repo_key | apt-key add -
-            apt-get update
+            add-apt-repository ppa:rkd-u/fhoss 
+            apt-get update 
 
-            # Configure /etc/clearwater/local_config.  Add xdms_hostname here to use Homer's management
-            # hostname instead of signaling.  This will override shared_config.  This works around
-            # https://github.com/Metaswitch/ellis/issues/153.
-            mkdir -p /etc/clearwater
-            etcd_ip=__etcd_ip__
-            [ -n "$etcd_ip" ] || etcd_ip=__private_mgmt_ip__
-            cat > /etc/clearwater/local_config << EOF
-            local_ip=__private_mgmt_ip__
-            public_ip=__public_mgmt_ip__
-            public_hostname=ellis-__index__.__zone__
-            etcd_cluster=$etcd_ip
-            xdms_hostname=homer-0.__zone__:7888
-            EOF
+            # Prepare to install the OpenIMS HSS noninteractively
+            # We want different signaling and management IPs. FHoSS installer
+            # doesn't deal with this and we'll need to give Tomcat the
+            # management IP afterwards as it doesn't like listening on ::.
+            debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/ip_to_use     string ::"
+            debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/hss_config    select yes"
+            debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/where_is_java string /usr/bin/java"
+            debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/dns_ip_to_use string"
+            debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/domain_to_use string __zone__"
+            debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/sql_password  string"
+            debconf-set-selections <<< "openimscore-fhoss       openimscore-fhoss/sql_data      select yes"
+            DEBIAN_FRONTEND="noninteractive" apt-get -y --force-yes install openimscore-fhoss
 
-            # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install ellis-node --yes --force-yes
-            DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
-
-            # Wait until etcd is up and running before uploading the shared_config
-            /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
-
-            # Configure and upload /etc/clearwater/shared_config.
-            cat > /etc/clearwater/shared_config << EOF
-            # Deployment definitions
-            home_domain=__zone__
-            sprout_hostname=sprout.__zone__
-            hs_hostname=hs.__zone__:8888
-            hs_provisioning_hostname=hs-prov.__zone__:8889
-            ralf_hostname=ralf.__zone__:10888
-            xdms_hostname=homer.__zone__:7888
-
-            upstream_port=0
-
-            cassandra_hostname=localhost
-
-            # Email server configuration
-            smtp_smarthost=localhost
-            smtp_username=username
-            smtp_password=password
-            email_recovery_sender=clearwater@example.org
-
-            # Keys
-            signup_key=secret
-            turn_workaround=secret
-            ellis_api_key=secret
-            ellis_cookie_key=secret
-            EOF
-
-            if [ __use_fhoss__ -eq 1 ]; then
-            cat >> /etc/clearwater/shared_config << EOF
-            # HSS configuration
-            hss_hostname=fhoss.__zone__
-            hss_realm=__zone__
-            hss_port=3868
-            EOF
-            fi
-
-            sudo /usr/share/clearwater/clearwater-config-manager/scripts/upload_shared_config
-
-            # Allocate a pool of numbers to assign to users.  Before we do this,
-            # restart clearwater-infrastructure to make sure that
-            # local_settings.py runs to pick up the configuration changes.
-            service clearwater-infrastructure restart
-            service ellis stop
-            /usr/share/clearwater/ellis/env/bin/python /usr/share/clearwater/ellis/src/metaswitch/ellis/tools/create_numbers.py --start __dn_range_start__ --count __dn_range_length__
+            # Appease Tomcat by giving it an explicit IP to listen on
+            sed -i "s/::/__private_mgmt_ip__/" /usr/share/java/fhoss-0.2/hss.properties
+            service openimscore-fhoss restart
 
             # Function to give DNS record type and IP address for specified IP address
             ip2rr() {
@@ -247,8 +188,7 @@ resources:
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
             server __dns_mgmt_ip__
-            update add ellis-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
-            update add ellis.__zone__. 30 $(ip2rr __public_mgmt_ip__)
+            update add fhoss.__zone__. 30 $(ip2rr __public_sig_ip__)
             send
             EOF
             } && [ $retries -lt 10 ]
@@ -259,9 +199,48 @@ resources:
             done
 
             # Use the DNS server.
+            apt-get -y --force-yes install dnsmasq 
             echo 'nameserver __dns_mgmt_ip__' > /etc/dnsmasq.resolv.conf
             echo 'RESOLV_CONF=/etc/dnsmasq.resolv.conf' >> /etc/default/dnsmasq
             service dnsmasq force-reload
+
+            # Set up some subscribers for testing
+            apt-get -y install python-mysqldb
+            cat > /usr/share/java/fhoss-0.2/provision_subs.py << EOF
+            import MySQLdb as m
+
+            cxn = m.connect('localhost', 'root', '', 'hss_db')
+            cur = cxn.cursor()
+
+            def provision(number):
+                impi = number + "@__zone__"
+                impu = "sip:" + impi
+                
+                cur.execute("INSERT INTO imsu (name, scscf_name, diameter_name, id_capabilities_set, id_preferred_scscf_set) VALUES (%s,'','',-1,-1);", (number,));
+                imsu_row = cur.lastrowid
+
+                cur.execute("INSERT INTO impi (id_imsu,identity,k,auth_scheme,default_auth_scheme,amf,op,sqn,ip,line_identifier,zh_uicc_type,zh_key_life_time,zh_default_auth_scheme) VALUES (%s,%s,'test',128,128,'\0\0','\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0','000000000000','','',0,3600,1);", (imsu_row, impi));
+                impi_row = int(cur.lastrowid);
+
+                cur.execute("INSERT INTO impu (identity,type,barring,user_state,id_sp,id_implicit_set,id_charging_info,wildcard_psi,display_name,psi_activation,can_register) VALUES (%s,0,0,0,1,0,-1,'','',0,1);", (impu,));
+                impu_row = int(cur.lastrowid);
+
+                cur.execute("UPDATE impu set id_implicit_set=%s where id=%s", (impu_row, impu_row))
+
+                cur.execute("INSERT INTO impu_visited_network (id_impu, id_visited_network) VALUES (%s,1);", (impu_row,))
+                cur.execute("INSERT INTO impi_impu (id_impi,id_impu,user_state) VALUES (%s,%s,0);", (impi_row, impu_row))
+
+                print impu
+
+            provision("imhotep")
+            provision("lovelace")
+            provision("dave")
+
+            cxn.close()
+
+            EOF
+
+            python /usr/share/java/fhoss-0.2/provision_subs.py
 
 outputs:
   public_mgmt_ip:
@@ -270,3 +249,6 @@ outputs:
   private_mgmt_ip:
     description: IP address in private management network
     value: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
+  public_sig_ip:
+    description: IP address in public signaling network
+    value: { get_attr: [ sig_port, fixed_ips, 0, ip_address ] }

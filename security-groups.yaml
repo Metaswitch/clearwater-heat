@@ -131,6 +131,29 @@ resources:
           port_range_min: 443
           port_range_max: 443
 
+  fhoss_mgmt:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-fhoss-mgmt } }
+      description: Security group for FHoSS (management)
+      rules:
+        # HTTP
+        - protocol: tcp
+          port_range_min: 8080
+          port_range_max: 8080
+  
+  fhoss_sig:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-fhoss-sig } }
+      description: Security group for FHoSS (signaling)
+      rules:
+        # HTTP
+        - protocol: tcp
+          ethertype: IPv6
+          port_range_min: 3868
+          port_range_max: 3868
+
   bono_sig:
     type: OS::Neutron::SecurityGroup
     properties:
@@ -392,8 +415,14 @@ outputs:
     description: Security group for DNS nodes
     value: { get_resource: dns }
   ellis_mgmt:
-    description: Security group for Ellis nodes (managment)
+    description: Security group for Ellis nodes (management)
     value: { get_resource: ellis_mgmt }
+  fhoss_mgmt:
+    description: Security group for FHoSS (management)
+    value: { get_resource: fhoss_mgmt }
+  fhoss_sig:
+    description: Security group for FHoSS (signaling)
+    value: { get_resource: fhoss_sig }
   bono_sig:
     description: Security group for Bono nodes (signaling)
     value: { get_resource: bono_sig }
