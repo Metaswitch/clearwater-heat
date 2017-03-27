@@ -33,7 +33,7 @@
 heat_template_version: 2013-05-23
 
 description: >
-  Clearwater Sprout node
+  Clearwater Vellum node
 
 parameters:
   public_mgmt_net_id:
@@ -89,12 +89,12 @@ parameters:
   base_mgmt_security_group:
     type: string
     description: ID of base security group for all Clearwater nodes (management)
-  sprout_sig_outbound_security_group:
+  vellum_sig_outbound_security_group:
     type: string
-    description: ID of security group for Sprout nodes outbound traffic (signaling)
-  sprout_sig_inbound_security_group:
+    description: ID of security group for Vellum nodes outbound traffic (signaling)
+  vellum_sig_inbound_security_group:
     type: string
-    description: ID of security group for Sprout nodes inbound traffic (signaling)
+    description: ID of security group for Vellum nodes inbound traffic (signaling)
   repo_url:
     type: string
     description: URL for Clearwater repository
@@ -121,7 +121,7 @@ parameters:
     default: ""
   index:
     type: number
-    description: Index of this Sprout node in the Sprout cluster
+    description: Index of this Vellum node in the Vellum cluster
     default: 0
 
 resources:
@@ -145,13 +145,13 @@ resources:
       # Specify the network ID by string to work around OpenStack issues - see https://github.com/Metaswitch/clearwater-heat/issues/18.
       network_id: { str_replace: { params: { x: { get_param: private_sig_net_id } }, template: x } }
       security_groups:
-        - { get_param: sprout_sig_outbound_security_group }
-        - { get_param: sprout_sig_inbound_security_group }
+        - { get_param: vellum_sig_outbound_security_group }
+        - { get_param: vellum_sig_inbound_security_group }
 
   server:
     type: OS::Nova::Server
     properties:
-      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: sprout-__index__.__zone__ } }
+      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: vellum-__index__.__zone__ } }
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
@@ -223,12 +223,12 @@ resources:
             management_local_ip=__private_mgmt_ip__
             local_ip=__private_sig_ip__
             public_ip=__private_sig_ip__
-            public_hostname=__index__.sprout.__zone__
+            public_hostname=__index__.vellum.__zone__
             etcd_cluster=$etcd_ip
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install sprout-node --yes --force-yes
+            DEBIAN_FRONTEND=noninteractive apt-get install vellum-node --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
             # Function to give DNS record type and IP address for specified IP address
@@ -244,17 +244,8 @@ resources:
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
             server __dns_mgmt_ip__
-            update add sprout-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
-            update add __index__.sprout.__zone__. 30 $(ip2rr __private_sig_ip__)
-            update add sprout.__zone__. 30 $(ip2rr __private_sig_ip__)
-            update add scscf.sprout.__zone__. 30 $(ip2rr __private_sig_ip__)
-            update add icscf.sprout.__zone__. 30 $(ip2rr __private_sig_ip__)
-            update add sprout.__zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.sprout.__zone__.
-            update add _sip._tcp.sprout.__zone__. 30 SRV 0 0 5054 __index__.sprout.__zone__.
-            update add icscf.sprout.__zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.icscf.sprout.__zone__.
-            update add _sip._tcp.icscf.sprout.__zone__. 30 SRV 0 0 5052 __index__.sprout.__zone__.
-            update add scscf.sprout.__zone__. 30 NAPTR 0 0 "s" "SIP+D2T" "" _sip._tcp.scscf.sprout.__zone__.
-            update add _sip._tcp.scscf.sprout.__zone__. 30 SRV 0 0 5054 __index__.sprout.__zone__.
+            update add vellum-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
+            update add vellum.__zone__. 30 $(ip2rr __private_sig_ip__)
             send
             EOF
             } && [ $retries -lt 10 ]
