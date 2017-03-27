@@ -189,13 +189,20 @@ resources:
             # Deployment definitions
             home_domain=__zone__
             sprout_hostname=sprout.__zone__
+            sprout_hostname_mgmt=sprout.__zone__:9886
             hs_hostname=hs.__zone__:8888
+            hs_hostname_mgmt=hs.__zone__:8886
             hs_provisioning_hostname=hs-prov.__zone__:8889
             ralf_hostname=ralf.__zone__:10888
             xdms_hostname=homer.__zone__:7888
-            sprout_registration_store=sprout.__zone__
-            ralf_session_store=ralf.__zone__
-
+            cdf_identity=cdf.__zone__.com
+            sprout_impi_store=vellum.__zone__.com
+            sprout_registration_store="site1=vellum-site1.__zone__.com"
+            cassandra_hostname=vellum.__zone__.com
+            chronos_hostname=vellum.__zone__.com
+            ralf_session_store="site1=vellum-site1.__zone__.com"
+            memento_auth_store=sprout.__zone__.com
+      
             upstream_port=0
 
             # Email server configuration
