@@ -92,6 +92,9 @@ parameters:
   dime_sig_security_group:
     type: string
     description: ID of security group for Dime nodes (signaling)
+  dime_mgmt_security_group:
+    type: string
+    description: ID of security group for Dime nodes (management)
   repo_url:
     type: string
     description: URL for Clearwater repository

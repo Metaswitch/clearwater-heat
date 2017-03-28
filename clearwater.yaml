@@ -311,7 +311,7 @@ resources:
   dime:
     type: OS::Heat::ResourceGroup
     properties:
-      count: { get_param: dimer_cluster_size }
+      count: { get_param: dime_cluster_size }
       index_var: __index__
       resource_def:
         type: ./dime.yaml
@@ -327,8 +327,7 @@ resources:
           key_name: { get_param: key_name }
           base_mgmt_security_group: { get_attr: [ security_groups, base_mgmt ] }
           dime_mgmt_security_group: { get_attr: [ security_groups, dime_mgmt ] }
-          dime_sig_outbound_security_group: { get_attr: [ security_groups, dime_sig_outbound ] }
-          dime_sig_inbound_security_group: { get_attr: [ security_groups, dime_sig_inbound ] }
+          dime_sig_security_group: { get_attr: [ security_groups, dime_sig ] }
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_mgmt_ip: { get_attr: [ dns, private_mgmt_ip ] }

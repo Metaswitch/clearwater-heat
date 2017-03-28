@@ -160,7 +160,7 @@ resources:
     type: OS::Neutron::SecurityGroup
     properties:
       name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-sprout-sig-outbound } }
-      description: Security group for Sprout nodes (signaling)
+      description: Security group for Sprout nodes outbound traffic (signaling)
       rules:
         # Internal SIP
         - protocol: tcp
@@ -178,10 +178,7 @@ resources:
     type: OS::Neutron::SecurityGroup
     properties:
       name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-sprout-sig-inbound } }
-      description: Additional security group for Sprout nodes (signaling) - required to avoid circular dependency
-      #            Specifically, Bono and Sprout depend on each other, as do Sprout and Homestead.  By dividing Sprout's
-      #            security group into one for other nodes to depend on (sprout) and a second to depend on other nodes
-      #            (sprout2), we break this cycle.
+      description: Security group for Sprout nodes inbound traffic (signaling) 
       rules:
         # Internal SIP
         - protocol: tcp
@@ -199,13 +196,13 @@ resources:
           port_range_min: 9888
           port_range_max: 9888
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: vellum_outbound }
+          remote_group_id: { get_resource: vellum_sig_outbound }
         # Notifications from Homestead
         - protocol: tcp
           port_range_min: 9888
           port_range_max: 9888
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: homestead_sig }
+          remote_group_id: { get_resource: dime_sig }
 
   homer_mgmt:
     type: OS::Neutron::SecurityGroup
@@ -296,7 +293,8 @@ resources:
     type: OS::Neutron::SecurityGroup
     properties:
       name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-vellum-sig-outbound } }
-      description: Security group for Vellum nodes (signaling)
+      description: Security group for Vellum nodes outbound traffic (signaling)
+      rules:
         # Chronos
         - protocol: tcp
           port_range_min: 7253
@@ -320,7 +318,7 @@ resources:
     type: OS::Neutron::SecurityGroup
     properties:
       name: { str_replace: { params: { __name_prefix__: { get_param: "name_prefix" } }, template: __name_prefix__-vellum-sig-inbound } }
-      description: Security group for Vellum nodes (signaling)
+      description: Security group for Vellum nodes inbound traffic (signaling)
       rules:
         # Astaire
         - protocol: tcp
@@ -350,7 +348,7 @@ resources:
           port_range_min: 9160
           port_range_max: 9160
           remote_mode: remote_group_id
-          remote_group_id: { get_resource: homestead_sig }
+          remote_group_id: { get_resource: dime_sig }
         # Homer
         - protocol: tcp
           port_range_min: 9160
