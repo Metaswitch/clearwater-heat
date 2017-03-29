@@ -343,13 +343,13 @@ resources:
           port_range_max: 7253
           remote_mode: remote_group_id
           remote_group_id: { get_resource: dime_sig }
-        # Homestead
+        # Cassandra Thrift
         - protocol: tcp
           port_range_min: 9160
           port_range_max: 9160
           remote_mode: remote_group_id
           remote_group_id: { get_resource: dime_sig }
-        # Homer
+        # Cassandra Thrift
         - protocol: tcp
           port_range_min: 9160
           port_range_max: 9160
