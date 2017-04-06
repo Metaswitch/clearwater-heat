@@ -178,7 +178,7 @@ resources:
             #!/bin/bash
 
             # Log all output to file.
-            exec > >(tee -a /var/log/clearwater-heat-sprout.log) 2>&1
+            exec > >(tee -a /var/log/clearwater-heat-vellum.log) 2>&1
             set -x
 
             # Set up the signaling network namespace on each boot by creating an init file and
@@ -283,10 +283,10 @@ resources:
 
 outputs:
   public_mgmt_ip:
-    description: IP address in public (management) network
+    description: IP address in public management network
     value: { get_attr: [ mgmt_floating_ip, floating_ip_address ] }
   private_mgmt_ip:
-    description: IP address in private signaling network
+    description: IP address in private management network
     value: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
   private_sig_ip:
     description: IP address in private signaling network

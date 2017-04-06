@@ -178,7 +178,7 @@ resources:
             #!/bin/bash
 
             # Log all output to file.
-            exec > >(tee -a /var/log/clearwater-heat-ralf.log) 2>&1
+            exec > >(tee -a /var/log/clearwater-heat-dime.log) 2>&1
             set -x
 
             # Set up the signaling network namespace on each boot by creating an init file and
