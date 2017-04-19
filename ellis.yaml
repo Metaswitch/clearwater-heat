@@ -193,12 +193,9 @@ resources:
             hs_provisioning_hostname=hs-prov.__zone__:8889
             ralf_hostname=ralf.__zone__:10888
             xdms_hostname=homer.__zone__:7888
-            sprout_impi_store=vellum.__zone__
-            sprout_registration_store=vellum.__zone__
-            cassandra_hostname=vellum.__zone__
-            chronos_hostname=vellum.__zone__
-            ralf_session_store=vellum.__zone__
-      
+            sprout_registration_store=sprout.__zone__
+            ralf_session_store=ralf.__zone__
+
             upstream_port=0
 
             # Email server configuration
