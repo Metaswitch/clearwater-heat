@@ -303,6 +303,11 @@ resources:
           port_range_max: 9160
           remote_mode: remote_group_id
           #remote_group_id: { get_resource: homestead_sig } # omit remote_group_id to reference yourself
+        - protocol: tcp
+          port_range_min: 7199
+          port_range_max: 7199
+          remote_mode: remote_group_id
+          #remote_group_id: { get_resource: homestead_sig } # omit remote_group_id to reference yourself
 
   ralf_sig:
     type: OS::Neutron::SecurityGroup
