@@ -155,13 +155,13 @@ parameters:
     type: number
     description: Number of Homer nodes in Homer cluster
     default: 1
-  dime_cluster_size:
+  homestead_cluster_size:
     type: number
-    description: Number of Dime nodes in Dime cluster
+    description: Number of Homestead nodes in Homestead cluster
     default: 1
-  vellum_cluster_size:
+  ralf_cluster_size:
     type: number
-    description: Number of Vellum nodes in Vellum cluster
+    description: Number of Ralf nodes in Ralf cluster
     default: 1
 
 resources:
@@ -270,8 +270,8 @@ resources:
           image: { get_param: image }
           key_name: { get_param: key_name }
           base_mgmt_security_group: { get_attr: [ security_groups, base_mgmt ] }
-          sprout_sig_outbound_security_group: { get_attr: [ security_groups, sprout_sig_outbound ] }
-          sprout_sig_inbound_security_group: { get_attr: [ security_groups, sprout_sig_inbound ] }
+          sprout_sig_security_group: { get_attr: [ security_groups, sprout_sig ] }
+          sprout_sig2_security_group: { get_attr: [ security_groups, sprout_sig2 ] }
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_mgmt_ip: { get_attr: [ dns, private_mgmt_ip ] }
@@ -308,13 +308,13 @@ resources:
           etcd_ip: { get_attr: [ ellis, private_mgmt_ip ] }
           index: __index__
 
-  dime:
+  homestead:
     type: OS::Heat::ResourceGroup
     properties:
-      count: { get_param: dime_cluster_size }
+      count: { get_param: homestead_cluster_size }
       index_var: __index__
       resource_def:
-        type: ./dime.yaml
+        type: ./homestead.yaml
         properties:
           public_mgmt_net_id: { get_param: public_mgmt_net_id }
           private_mgmt_net_id: { get_attr: [ mgmt_network, private_net ] }
@@ -326,8 +326,8 @@ resources:
           image: { get_param: image }
           key_name: { get_param: key_name }
           base_mgmt_security_group: { get_attr: [ security_groups, base_mgmt ] }
-          dime_mgmt_security_group: { get_attr: [ security_groups, dime_mgmt ] }
-          dime_sig_security_group: { get_attr: [ security_groups, dime_sig ] }
+          homestead_mgmt_security_group: { get_attr: [ security_groups, homestead_mgmt ] }
+          homestead_sig_security_group: { get_attr: [ security_groups, homestead_sig ] }
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_mgmt_ip: { get_attr: [ dns, private_mgmt_ip ] }
@@ -336,13 +336,13 @@ resources:
           etcd_ip: { get_attr: [ ellis, private_mgmt_ip ] }
           index: __index__
 
-  vellum:
+  ralf:
     type: OS::Heat::ResourceGroup
     properties:
-      count: { get_param: vellum_cluster_size }
+      count: { get_param: ralf_cluster_size }
       index_var: __index__
       resource_def:
-        type: ./vellum.yaml
+        type: ./ralf.yaml
         properties:
           public_mgmt_net_id: { get_param: public_mgmt_net_id }
           private_mgmt_net_id: { get_attr: [ mgmt_network, private_net ] }
@@ -354,8 +354,7 @@ resources:
           image: { get_param: image }
           key_name: { get_param: key_name }
           base_mgmt_security_group: { get_attr: [ security_groups, base_mgmt ] }
-          vellum_sig_outbound_security_group: { get_attr: [ security_groups, vellum_sig_outbound ] }
-          vellum_sig_inbound_security_group: { get_attr: [ security_groups, vellum_sig_inbound ] }
+          ralf_sig_security_group: { get_attr: [ security_groups, ralf_sig ] }
           repo_url: { get_param: repo_url }
           zone: { get_param: zone }
           dns_mgmt_ip: { get_attr: [ dns, private_mgmt_ip ] }
