@@ -33,7 +33,7 @@
 heat_template_version: 2013-05-23
 
 description: >
-  Clearwater Ralf node
+  Clearwater Dime node
 
 parameters:
   public_mgmt_net_id:
@@ -89,9 +89,12 @@ parameters:
   base_mgmt_security_group:
     type: string
     description: ID of base security group for all Clearwater nodes (management)
-  ralf_sig_security_group:
+  dime_sig_security_group:
     type: string
-    description: ID of security group for Ralf nodes (signaling)
+    description: ID of security group for Dime nodes (signaling)
+  dime_mgmt_security_group:
+    type: string
+    description: ID of security group for Dime nodes (management)
   repo_url:
     type: string
     description: URL for Clearwater repository
@@ -129,6 +132,7 @@ resources:
       network_id: { str_replace: { params: { x: { get_param: private_mgmt_net_id } }, template: x } }
       security_groups:
         - { get_param: base_mgmt_security_group }
+        - { get_param: dime_mgmt_security_group }
 
   mgmt_floating_ip:
     type: OS::Neutron::FloatingIP
@@ -142,12 +146,12 @@ resources:
       # Specify the network ID by string to work around OpenStack issues - see https://github.com/Metaswitch/clearwater-heat/issues/18.
       network_id: { str_replace: { params: { x: { get_param: private_sig_net_id } }, template: x } }
       security_groups:
-        - { get_param: ralf_sig_security_group }
+        - { get_param: dime_sig_security_group }
 
   server:
     type: OS::Nova::Server
     properties:
-      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: ralf-__index__.__zone__ } }
+      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: dime-__index__.__zone__ } }
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
@@ -174,7 +178,7 @@ resources:
             #!/bin/bash
 
             # Log all output to file.
-            exec > >(tee -a /var/log/clearwater-heat-ralf.log) 2>&1
+            exec > >(tee -a /var/log/clearwater-heat-dime.log) 2>&1
             set -x
 
             # Set up the signaling network namespace on each boot by creating an init file and
@@ -219,31 +223,12 @@ resources:
             management_local_ip=__private_mgmt_ip__
             local_ip=__private_sig_ip__
             public_ip=__private_sig_ip__
-            public_hostname=ralf-__index__.__zone__
+            public_hostname=dime-__index__.__zone__
             etcd_cluster=$etcd_ip
             EOF
 
-            # Create /etc/chronos/chronos.conf.
-            mkdir -p /etc/chronos
-            cat > /etc/chronos/chronos.conf << EOF
-            [http]
-            bind-address = __private_sig_ip__
-            bind-port = 7253
-            threads = 50
-
-            [logging]
-            folder = /var/log/chronos
-            level = 2
-
-            [alarms]
-            enabled = true
-
-            [exceptions]
-            max_ttl = 600
-            EOF
-
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install ralf-node --yes --force-yes
+            DEBIAN_FRONTEND=noninteractive apt-get install dime-node --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
             # Function to give DNS record type and IP address for specified IP address
@@ -259,8 +244,10 @@ resources:
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
             server __dns_mgmt_ip__
-            update add ralf-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
+            update add dime-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
             update add ralf.__zone__. 30 $(ip2rr __private_sig_ip__)
+            update add hs.__zone__. 30 $(ip2rr __private_sig_ip__)
+            update add hs-prov.__zone__. 30 $(ip2rr __private_mgmt_ip__)
             send
             EOF
             } && [ $retries -lt 10 ]
