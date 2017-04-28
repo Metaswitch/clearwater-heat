@@ -178,7 +178,7 @@ resources:
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install ellis-node --yes --force-yes
+            DEBIAN_FRONTEND=noninteractive apt-get install ellis --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
             # Wait until etcd is up and running before uploading the shared_config
@@ -198,7 +198,7 @@ resources:
             cassandra_hostname=vellum.__zone__
             chronos_hostname=vellum.__zone__
             ralf_session_store=vellum.__zone__
-      
+
             upstream_port=0
 
             # Email server configuration
