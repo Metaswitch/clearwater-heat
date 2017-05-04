@@ -33,7 +33,7 @@
 heat_template_version: 2013-05-23
 
 description: >
-  Clearwater Ralf node
+  Clearwater Vellum node
 
 parameters:
   public_mgmt_net_id:
@@ -89,9 +89,12 @@ parameters:
   base_mgmt_security_group:
     type: string
     description: ID of base security group for all Clearwater nodes (management)
-  ralf_sig_security_group:
+  vellum_sig_outbound_security_group:
     type: string
-    description: ID of security group for Ralf nodes (signaling)
+    description: ID of security group for Vellum nodes outbound traffic (signaling)
+  vellum_sig_inbound_security_group:
+    type: string
+    description: ID of security group for Vellum nodes inbound traffic (signaling)
   repo_url:
     type: string
     description: URL for Clearwater repository
@@ -118,7 +121,7 @@ parameters:
     default: ""
   index:
     type: number
-    description: Index of this Ralf node in the Ralf cluster
+    description: Index of this Vellum node in the Vellum cluster
     default: 0
 
 resources:
@@ -142,12 +145,13 @@ resources:
       # Specify the network ID by string to work around OpenStack issues - see https://github.com/Metaswitch/clearwater-heat/issues/18.
       network_id: { str_replace: { params: { x: { get_param: private_sig_net_id } }, template: x } }
       security_groups:
-        - { get_param: ralf_sig_security_group }
+        - { get_param: vellum_sig_outbound_security_group }
+        - { get_param: vellum_sig_inbound_security_group }
 
   server:
     type: OS::Nova::Server
     properties:
-      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: ralf-__index__.__zone__ } }
+      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: vellum-__index__.__zone__ } }
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
@@ -174,7 +178,7 @@ resources:
             #!/bin/bash
 
             # Log all output to file.
-            exec > >(tee -a /var/log/clearwater-heat-ralf.log) 2>&1
+            exec > >(tee -a /var/log/clearwater-heat-vellum.log) 2>&1
             set -x
 
             # Set up the signaling network namespace on each boot by creating an init file and
@@ -219,7 +223,7 @@ resources:
             management_local_ip=__private_mgmt_ip__
             local_ip=__private_sig_ip__
             public_ip=__private_sig_ip__
-            public_hostname=ralf-__index__.__zone__
+            public_hostname=__index__.vellum.__zone__
             etcd_cluster=$etcd_ip
             EOF
 
@@ -238,12 +242,12 @@ resources:
             [alarms]
             enabled = true
 
-            [exceptions]
-            max_ttl = 600
+            [dns]
+            servers = __dns_sig_ip__
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install ralf-node --yes --force-yes
+            DEBIAN_FRONTEND=noninteractive apt-get install vellum --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
             # Function to give DNS record type and IP address for specified IP address
@@ -259,8 +263,8 @@ resources:
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
             server __dns_mgmt_ip__
-            update add ralf-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
-            update add ralf.__zone__. 30 $(ip2rr __private_sig_ip__)
+            update add vellum-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
+            update add vellum.__zone__. 30 $(ip2rr __private_sig_ip__)
             send
             EOF
             } && [ $retries -lt 10 ]
@@ -279,10 +283,10 @@ resources:
 
 outputs:
   public_mgmt_ip:
-    description: IP address in public (management) network
+    description: IP address in public management network
     value: { get_attr: [ mgmt_floating_ip, floating_ip_address ] }
   private_mgmt_ip:
-    description: IP address in private signaling network
+    description: IP address in private management network
     value: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
   private_sig_ip:
     description: IP address in private signaling network

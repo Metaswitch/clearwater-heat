@@ -33,7 +33,7 @@
 heat_template_version: 2013-05-23
 
 description: >
-  Clearwater Homestead node
+  Clearwater Dime node
 
 parameters:
   public_mgmt_net_id:
@@ -89,12 +89,12 @@ parameters:
   base_mgmt_security_group:
     type: string
     description: ID of base security group for all Clearwater nodes (management)
-  homestead_mgmt_security_group:
+  dime_sig_security_group:
     type: string
-    description: ID of security group for Homestead nodes (management)
-  homestead_sig_security_group:
+    description: ID of security group for Dime nodes (signaling)
+  dime_mgmt_security_group:
     type: string
-    description: ID of security group for Homestead nodes (signaling)
+    description: ID of security group for Dime nodes (management)
   repo_url:
     type: string
     description: URL for Clearwater repository
@@ -121,7 +121,7 @@ parameters:
     default: ""
   index:
     type: number
-    description: Index of this Homestead node in the Homestead cluster
+    description: Index of this Ralf node in the Ralf cluster
     default: 0
 
 resources:
@@ -132,7 +132,7 @@ resources:
       network_id: { str_replace: { params: { x: { get_param: private_mgmt_net_id } }, template: x } }
       security_groups:
         - { get_param: base_mgmt_security_group }
-        - { get_param: homestead_mgmt_security_group }
+        - { get_param: dime_mgmt_security_group }
 
   mgmt_floating_ip:
     type: OS::Neutron::FloatingIP
@@ -146,12 +146,12 @@ resources:
       # Specify the network ID by string to work around OpenStack issues - see https://github.com/Metaswitch/clearwater-heat/issues/18.
       network_id: { str_replace: { params: { x: { get_param: private_sig_net_id } }, template: x } }
       security_groups:
-        - { get_param: homestead_sig_security_group }
+        - { get_param: dime_sig_security_group }
 
   server:
     type: OS::Nova::Server
     properties:
-      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: homestead-__index__.__zone__ } }
+      name: { str_replace: { params: { __index__: { get_param: index }, __zone__: { get_param: zone } }, template: dime-__index__.__zone__ } }
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key_name }
@@ -178,7 +178,7 @@ resources:
             #!/bin/bash
 
             # Log all output to file.
-            exec > >(tee -a /var/log/clearwater-heat-homestead.log) 2>&1
+            exec > >(tee -a /var/log/clearwater-heat-dime.log) 2>&1
             set -x
 
             # Set up the signaling network namespace on each boot by creating an init file and
@@ -223,12 +223,12 @@ resources:
             management_local_ip=__private_mgmt_ip__
             local_ip=__private_sig_ip__
             public_ip=__private_sig_ip__
-            public_hostname=homestead-__index__.__zone__
+            public_hostname=dime-__index__.__zone__
             etcd_cluster=$etcd_ip
             EOF
 
             # Now install the software.
-            DEBIAN_FRONTEND=noninteractive apt-get install homestead-node clearwater-prov-tools --yes --force-yes
+            DEBIAN_FRONTEND=noninteractive apt-get install dime --yes --force-yes
             DEBIAN_FRONTEND=noninteractive apt-get install clearwater-management --yes --force-yes
 
             # Function to give DNS record type and IP address for specified IP address
@@ -244,9 +244,10 @@ resources:
             retries=0
             while ! { nsupdate -y "__zone__:__dnssec_key__" -v << EOF
             server __dns_mgmt_ip__
-            update add homestead-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
-            update add hs-prov.__zone__. 30 $(ip2rr __private_mgmt_ip__)
+            update add dime-__index__.__zone__. 30 $(ip2rr __public_mgmt_ip__)
+            update add ralf.__zone__. 30 $(ip2rr __private_sig_ip__)
             update add hs.__zone__. 30 $(ip2rr __private_sig_ip__)
+            update add hs-prov.__zone__. 30 $(ip2rr __private_mgmt_ip__)
             send
             EOF
             } && [ $retries -lt 10 ]
@@ -265,10 +266,10 @@ resources:
 
 outputs:
   public_mgmt_ip:
-    description: IP address in public management network
+    description: IP address in public (management) network
     value: { get_attr: [ mgmt_floating_ip, floating_ip_address ] }
   private_mgmt_ip:
-    description: IP address in private management network
+    description: IP address in private signaling network
     value: { get_attr: [ mgmt_port, fixed_ips, 0, ip_address ] }
   private_sig_ip:
     description: IP address in private signaling network
