@@ -308,6 +308,7 @@ resources:
           remote_mode: remote_group_id
           remote_group_id: { get_resource: dime_sig }
         # Chronos 
+        - protocol: tcp
           port_range_min: 7253
           port_range_max: 7253
           remote_mode: remote_group_id
