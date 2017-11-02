@@ -160,7 +160,7 @@ resources:
             /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
 
             # Configure and upload /etc/clearwater/shared_config.
-            /usr/share/clearwater/clearwater-config-manager/scripts/cw-config download shared_config
+            /usr/share/clearwater/clearwater-config-manager/scripts/cw-config download shared_config --autoconfirm
             cat > $HOME/clearwater-config-manager/$USER/shared_config << EOF
             # Deployment definitions
             home_domain=__zone__
@@ -190,7 +190,7 @@ resources:
             ellis_api_key=secret
             ellis_cookie_key=secret
             EOF
-            /usr/share/clearwater/clearwater-config-manager/scripts/cw-config upload shared_config
+            /usr/share/clearwater/clearwater-config-manager/scripts/cw-config upload shared_config --autoconfirm
 
             # Allocate a pool of numbers to assign to users.  Before we do this,
             # restart clearwater-infrastructure to make sure that
