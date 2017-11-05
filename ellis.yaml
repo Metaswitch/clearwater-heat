@@ -160,8 +160,8 @@ resources:
             /usr/share/clearwater/clearwater-etcd/scripts/wait_for_etcd
 
             # Configure and upload /etc/clearwater/shared_config.
-            /usr/share/clearwater/clearwater-config-manager/scripts/cw-config download shared_config --autoconfirm
-            cat > $HOME/clearwater-config-manager/$USER/shared_config << EOF
+            LOCAL_SHARED_CFG=$(/usr/share/clearwater/clearwater-config-manager/scripts/cw-config download shared_config --autoconfirm |sed 's/shared_config downloaded to //')
+            cat > $LOCAL_SHARED_CFG << EOF
             # Deployment definitions
             home_domain=__zone__
             sprout_hostname=sprout.__zone__
