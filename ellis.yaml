@@ -161,7 +161,7 @@ resources:
 
             # Configure and upload /etc/clearwater/shared_config.
             /usr/share/clearwater/clearwater-config-manager/scripts/cw-config download shared_config --autoconfirm --dir /tmp
-            cat > $HOME/clearwater-config-manager/$USER/shared_config << EOF
+            cat > /tmp/shared_config << EOF
             # Deployment definitions
             home_domain=__zone__
             sprout_hostname=sprout.__zone__
