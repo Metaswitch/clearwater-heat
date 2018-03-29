@@ -197,7 +197,7 @@ resources:
             # local_settings.py runs to pick up the configuration changes.
             service clearwater-infrastructure restart
             service ellis stop
-            /usr/share/clearwater/ellis/env/bin/python /usr/share/clearwater/ellis/src/metaswitch/ellis/tools/create_numbers.py --start __dn_range_start__ --count __dn_range_length__
+            /usr/share/clearwater/ellis/env/bin/python /usr/share/clearwater/ellis/src/metaswitch/ellis/tools/create_numbers.py --start __dn_range_start__ --count __dn_range_length__ --realm __zone__
 
             # Function to give DNS record type and IP address for specified IP address
             ip2rr() {
